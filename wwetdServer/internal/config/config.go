@@ -18,6 +18,7 @@ type Config struct {
 	Mongo     MongoConfig
 	Redis     RedisConfig
 	Cache     CacheConfig
+	Piso      PisoConfig
 	WebSocket WebSocketConfig
 }
 
@@ -50,7 +51,14 @@ type RedisConfig struct {
 }
 
 type CacheConfig struct {
-	UserTTL time.Duration
+	UserTTL     time.Duration
+	LocationTTL time.Duration
+}
+
+type PisoConfig struct {
+	APIKey  string
+	BaseURL string
+	Timeout time.Duration
 }
 
 type WebSocketConfig struct {
@@ -76,6 +84,16 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 
+	locationTTL, err := getEnvAsDuration("LOCATION_CACHE_TTL", 24*time.Hour)
+	if err != nil {
+		return Config{}, err
+	}
+
+	pisoTimeout, err := getEnvAsDuration("PISO_TIMEOUT", 8*time.Second)
+	if err != nil {
+		return Config{}, err
+	}
+
 	cfg := Config{
 		App: AppConfig{
 			Env: getEnv("APP_ENV", "development"),
@@ -97,7 +115,13 @@ func Load() (Config, error) {
 			DB:       redisDB,
 		},
 		Cache: CacheConfig{
-			UserTTL: userTTL,
+			UserTTL:     userTTL,
+			LocationTTL: locationTTL,
+		},
+		Piso: PisoConfig{
+			APIKey:  getEnv("PISO_API_KEY", ""),
+			BaseURL: getEnv("PISO_BASE_URL", "https://api.pisomap.tech"),
+			Timeout: pisoTimeout,
 		},
 		WebSocket: WebSocketConfig{
 			AllowedOrigins: getEnvAsCSV("WS_ALLOWED_ORIGINS", []string{"*"}),

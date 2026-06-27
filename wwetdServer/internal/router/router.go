@@ -10,9 +10,10 @@ import (
 )
 
 type Dependencies struct {
-	Health    *handler.HealthHandler
-	Users     *handler.UserHandler
-	WebSocket *handler.WebSocketHandler
+	Health      *handler.HealthHandler
+	Users       *handler.UserHandler
+	Restaurants *handler.RestaurantHandler
+	WebSocket   *handler.WebSocketHandler
 }
 
 func New(cfg config.Config, deps Dependencies) *gin.Engine {
@@ -32,6 +33,12 @@ func New(cfg config.Config, deps Dependencies) *gin.Engine {
 			users.POST("", deps.Users.Create)
 			users.GET("", deps.Users.List)
 			users.GET("/:id", deps.Users.GetByID)
+		}
+
+		restaurants := api.Group("/restaurants")
+		{
+			restaurants.GET("/nearby", deps.Restaurants.SearchNearby)
+			restaurants.GET("/today", deps.Restaurants.PickNearby)
 		}
 
 		api.GET("/ws", deps.WebSocket.Handle)

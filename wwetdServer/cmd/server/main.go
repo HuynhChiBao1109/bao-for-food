@@ -16,6 +16,7 @@ import (
 	"wwetd-server/internal/infrastructure/mongodb"
 	"wwetd-server/internal/infrastructure/realtime"
 	redisinfra "wwetd-server/internal/infrastructure/redis"
+	"wwetd-server/internal/integrations/piso"
 	"wwetd-server/internal/interfaces"
 	"wwetd-server/internal/repository"
 	"wwetd-server/internal/router"
@@ -73,7 +74,10 @@ func main() {
 		log.Fatalf("start redis websocket bridge: %v", err)
 	}
 
+	pisoClient := piso.NewClient(cfg.Piso)
+
 	userService := service.NewUserService(userRepo, redisClient, cfg.Cache.UserTTL, cfg.WebSocket.RedisChannel)
+	restaurantService := service.NewRestaurantService(redisClient, pisoClient, cfg.Cache.LocationTTL)
 	healthService := service.NewHealthService(map[string]interfaces.Pinger{
 		"mongodb": mongoClient,
 		"redis":   redisClient,
@@ -81,12 +85,14 @@ func main() {
 
 	healthHandler := handler.NewHealthHandler(healthService)
 	userHandler := handler.NewUserHandler(userService)
+	restaurantHandler := handler.NewRestaurantHandler(restaurantService)
 	webSocketHandler := handler.NewWebSocketHandler(hub)
 
 	engine := router.New(cfg, router.Dependencies{
-		Health:    healthHandler,
-		Users:     userHandler,
-		WebSocket: webSocketHandler,
+		Health:      healthHandler,
+		Users:       userHandler,
+		Restaurants: restaurantHandler,
+		WebSocket:   webSocketHandler,
 	})
 
 	server := &http.Server{
