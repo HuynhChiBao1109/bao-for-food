@@ -59,6 +59,24 @@ func (h *RestaurantHandler) PickNearby(c *gin.Context) {
 	respondOK(c, result)
 }
 
+func (h *RestaurantHandler) GetDetail(c *gin.Context) {
+	userID := h.optionalUserID(c)
+	location := dto.ClientLocation{Lat: parseFloatQuery(c, "lat"), Lng: parseFloatQuery(c, "lng")}
+
+	result, err := h.service.GetDetail(c.Request.Context(), userID, c.Param("data_id"), location)
+	if err != nil {
+		if errors.Is(err, domain.ErrRestaurantNotFound) {
+			respondError(c, http.StatusNotFound, "restaurant not found")
+			return
+		}
+
+		respondError(c, http.StatusBadGateway, "failed to get restaurant detail")
+		return
+	}
+
+	respondOK(c, result)
+}
+
 func (h *RestaurantHandler) RecordViewed(c *gin.Context) {
 	userID, ok := h.requiredUserID(c)
 	if !ok {

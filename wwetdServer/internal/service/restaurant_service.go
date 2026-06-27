@@ -112,6 +112,20 @@ func (s *restaurantService) PickNearby(ctx context.Context, query dto.NearbyRest
 		Source:       nearby.Source,
 		DetailSource: detailSource,
 		Restaurant:   detail,
+		IsSaved:      s.isSaved(ctx, query.UserID, dataID),
+	}, nil
+}
+
+func (s *restaurantService) GetDetail(ctx context.Context, userID string, dataID string, location dto.ClientLocation) (dto.RestaurantDetailResponse, error) {
+	detail, detailSource, err := s.getPlaceDetail(ctx, dataID, location)
+	if err != nil {
+		return dto.RestaurantDetailResponse{}, err
+	}
+
+	return dto.RestaurantDetailResponse{
+		DetailSource: detailSource,
+		Restaurant:   detail,
+		IsSaved:      s.isSaved(ctx, userID, dataID),
 	}, nil
 }
 
@@ -406,6 +420,15 @@ func (s *restaurantService) getViewedItems(ctx context.Context, userID string) (
 		return nil, err
 	}
 	return items, nil
+}
+
+func (s *restaurantService) isSaved(ctx context.Context, userID string, dataID string) bool {
+	if s.userRestaurants == nil || strings.TrimSpace(userID) == "" || strings.TrimSpace(dataID) == "" {
+		return false
+	}
+
+	ok, err := s.userRestaurants.IsSaved(ctx, userID, dataID)
+	return err == nil && ok
 }
 
 func toUserRestaurantItems(items []domain.UserRestaurant) []dto.UserRestaurantItem {

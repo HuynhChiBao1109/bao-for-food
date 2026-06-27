@@ -6,10 +6,10 @@ import { useAuth } from '@/contexts/auth-context';
 import { useCurrentLocation } from '@/contexts/location-context';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Animated,
   Image,
   Linking,
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -91,6 +91,7 @@ type PisoRestaurant = {
 type TodayEatResponse = {
   data: {
     detail_source?: string;
+    is_saved?: boolean;
     restaurant: PisoRestaurant;
   };
 };
@@ -162,10 +163,11 @@ export default function TodayEatScreen() {
   const [startIndex, setStartIndex] = useState(0);
   const [dots, setDots] = useState('');
   const [loading, setLoading] = useState(true);
-  const [showReason, setShowReason] = useState(false);
   const [restaurant, setRestaurant] = useState<PisoRestaurant | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
+  const [isSaved, setIsSaved] = useState(false);
+  const [saveState, setSaveState] = useState<'idle' | 'loading' | 'success'>('idle');
   const { coordinates } = useCurrentLocation();
   const { token, user } = useAuth();
 
@@ -216,6 +218,8 @@ export default function TodayEatScreen() {
 
       const payload = (await response.json()) as TodayEatResponse;
       setRestaurant(payload.data.restaurant);
+      setIsSaved(Boolean(payload.data.is_saved));
+      setSaveState('idle');
       setActivePhotoIndex(0);
     } catch (err) {
       setRestaurant(null);
@@ -245,20 +249,41 @@ export default function TodayEatScreen() {
 
   const postRestaurantAction = useCallback(
     async (action: 'viewed' | 'saved') => {
-      if (!token || !restaurant?.data_id) return;
+      if (!token || !restaurant?.data_id) return false;
 
       const url = restaurantActionURL(action);
-      if (!url) return;
+      if (!url) return false;
 
-      await fetch(url, {
+      const response = await fetch(url, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
+      return response.ok;
     },
     [restaurant?.data_id, restaurantActionURL, token],
   );
+
+  const saveRestaurant = useCallback(async () => {
+    if (!user || isSaved || saveState === 'loading') return;
+
+    setSaveState('loading');
+    const ok = await postRestaurantAction('saved');
+    if (ok) {
+      setIsSaved(true);
+      setSaveState('success');
+      setTimeout(() => setSaveState('idle'), 1500);
+    } else {
+      setSaveState('idle');
+    }
+  }, [isSaved, postRestaurantAction, saveState, user]);
+
+  const pickNextRestaurant = useCallback(async () => {
+    await postRestaurantAction('viewed');
+    setStartIndex(0);
+    pickRestaurant();
+  }, [pickRestaurant, postRestaurantAction]);
 
   useEffect(() => {
     if (!loading) return;
@@ -499,46 +524,32 @@ export default function TodayEatScreen() {
             </Pressable>
 
             <Pressable
-              disabled={!user}
-              style={[styles.actionBtn, user ? styles.saveBtn : styles.disabledActionBtn]}
-              onPress={() => postRestaurantAction('saved')}
+              disabled={!user || isSaved || saveState === 'loading'}
+              style={[
+                styles.actionBtn,
+                user ? styles.saveBtn : styles.disabledActionBtn,
+                isSaved ? styles.savedBtn : null,
+              ]}
+              onPress={saveRestaurant}
             >
-              <ThemedText style={styles.saveBtnText}>Lưu quán</ThemedText>
+              {saveState === 'loading' ? (
+                <ActivityIndicator color={INK} size="small" />
+              ) : (
+                <ThemedText style={styles.saveBtnText}>
+                  {saveState === 'success' ? 'Lưu thành công' : isSaved ? 'Đã lưu' : 'Lưu quán'}
+                </ThemedText>
+              )}
             </Pressable>
 
             <Pressable
               style={[styles.actionBtn, styles.nextBtn]}
-              onPress={() => setShowReason(true)}
+              onPress={pickNextRestaurant}
             >
               <ThemedText style={styles.nextBtnText}>Đổi quán</ThemedText>
             </Pressable>
           </View>
         </Animated.View>
       )}
-
-      <Modal transparent visible={showReason} animationType="fade">
-        <View style={styles.overlay}>
-          <View style={styles.popup}>
-            <ThemedText type="title" style={styles.popupTitle}>
-              Vì sao bạn muốn đổi quán?
-            </ThemedText>
-
-            {['Không thích món này hôm nay', 'Quán không phù hợp', 'Khác'].map((reason) => (
-              <Pressable
-                key={reason}
-                style={styles.reasonBtn}
-                onPress={() => {
-                  setShowReason(false);
-                  setStartIndex(0);
-                  pickRestaurant();
-                }}
-              >
-                <ThemedText style={styles.reasonText}>{reason}</ThemedText>
-              </Pressable>
-            ))}
-          </View>
-        </View>
-      </Modal>
     </ThemedView>
   );
 }
@@ -849,6 +860,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#f4d35e',
   },
 
+  savedBtn: {
+    backgroundColor: '#dbeabf',
+  },
+
   disabledActionBtn: {
     backgroundColor: '#d6dfc5',
     opacity: 0.55,
@@ -866,39 +881,4 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
 
-  overlay: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(17,28,9,0.5)',
-    flex: 1,
-    justifyContent: 'center',
-    padding: 24,
-  },
-
-  popup: {
-    backgroundColor: SURFACE,
-    borderRadius: 20,
-    padding: 20,
-    width: '100%',
-  },
-
-  popupTitle: {
-    color: INK,
-    fontFamily: Fonts.rounded,
-    fontWeight: '900',
-    marginBottom: 12,
-  },
-
-  reasonBtn: {
-    backgroundColor: SURFACE_SOFT,
-    borderRadius: 14,
-    marginBottom: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 13,
-  },
-
-  reasonText: {
-    color: INK,
-    fontFamily: Fonts.sans,
-    fontWeight: '700',
-  },
 });

@@ -15,6 +15,7 @@ type PisoSearcher interface {
 type RestaurantService interface {
 	SearchNearby(ctx context.Context, query dto.NearbyRestaurantsQuery) (dto.NearbyRestaurantsResponse, error)
 	PickNearby(ctx context.Context, query dto.NearbyRestaurantsQuery) (dto.PickRestaurantResponse, error)
+	GetDetail(ctx context.Context, userID string, dataID string, location dto.ClientLocation) (dto.RestaurantDetailResponse, error)
 	RecordViewed(ctx context.Context, userID string, dataID string, location dto.ClientLocation) error
 	ListViewed(ctx context.Context, userID string) ([]dto.UserRestaurantItem, error)
 	SaveRestaurant(ctx context.Context, userID string, dataID string, location dto.ClientLocation) error

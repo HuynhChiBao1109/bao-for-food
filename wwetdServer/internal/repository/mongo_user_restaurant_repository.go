@@ -65,3 +65,11 @@ func (r *MongoUserRestaurantRepository) ListSaved(ctx context.Context, userID st
 	}
 	return items, nil
 }
+
+func (r *MongoUserRestaurantRepository) IsSaved(ctx context.Context, userID string, dataID string) (bool, error) {
+	count, err := r.collection.CountDocuments(ctx, bson.M{"user_id": userID, "data_id": dataID})
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}

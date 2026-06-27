@@ -52,6 +52,7 @@ func New(cfg config.Config, deps Dependencies) *gin.Engine {
 			restaurants.POST("/:data_id/viewed", deps.Restaurants.RecordViewed)
 			restaurants.GET("/saved", deps.Restaurants.ListSaved)
 			restaurants.POST("/:data_id/saved", deps.Restaurants.Save)
+			restaurants.GET("/:data_id", deps.Restaurants.GetDetail)
 		}
 
 		api.GET("/ws", deps.WebSocket.Handle)

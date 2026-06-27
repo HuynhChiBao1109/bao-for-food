@@ -10,7 +10,13 @@ import { useCurrentLocation } from '@/contexts/location-context';
 type AuthMode = 'intro' | 'login' | 'register' | 'otp';
 
 export default function HomeScreen() {
-  const { coordinates, loading, permissionStatus, requestCurrentLocation } = useCurrentLocation();
+  const {
+    coordinates,
+    dismissLocationPermission,
+    loading,
+    permissionStatus,
+    requestCurrentLocation,
+  } = useCurrentLocation();
   const {
     booting: authBooting,
     login,
@@ -48,8 +54,8 @@ export default function HomeScreen() {
     }
   }, [coordinates, permissionStatus, showLoginPopup]);
 
-  const askLocation = async () => {
-    await requestCurrentLocation();
+  const askLocation = async (scope: 'foreground' | 'background') => {
+    await requestCurrentLocation(scope);
     setShowLocationPopup(false);
   };
 
@@ -149,14 +155,32 @@ export default function HomeScreen() {
               quán dựa trên IP.
             </ThemedText>
 
-            <Pressable style={styles.allowBtn} onPress={askLocation} disabled={loading}>
+            <Pressable
+              style={styles.allowBtn}
+              onPress={() => askLocation('foreground')}
+              disabled={loading}
+            >
               <ThemedText style={styles.allowText}>
-                {loading ? 'Đang lấy vị trí...' : 'Cho phép vị trí'}
+                {loading ? 'Đang lấy vị trí...' : 'Trong khi dùng ứng dụng'}
               </ThemedText>
             </Pressable>
 
-            <Pressable style={styles.skipBtn} onPress={() => setShowLocationPopup(false)}>
-              <ThemedText style={styles.skipText}>Để sau</ThemedText>
+            <Pressable
+              style={[styles.allowBtn, styles.alwaysBtn]}
+              onPress={() => askLocation('background')}
+              disabled={loading}
+            >
+              <ThemedText style={styles.allowText}>Luôn luôn cho phép</ThemedText>
+            </Pressable>
+
+            <Pressable
+              style={styles.skipBtn}
+              onPress={() => {
+                dismissLocationPermission();
+                setShowLocationPopup(false);
+              }}
+            >
+              <ThemedText style={styles.skipText}>Không cho phép</ThemedText>
             </Pressable>
           </View>
         </View>
@@ -337,6 +361,10 @@ const styles = StyleSheet.create({
   allowText: {
     color: '#fffdf5',
     fontWeight: '800',
+  },
+  alwaysBtn: {
+    backgroundColor: '#496a24',
+    marginTop: 10,
   },
   skipBtn: {
     alignItems: 'center',

@@ -215,3 +215,12 @@ func (r *fakeUserRestaurantRepo) ListSaved(_ context.Context, userID string) ([]
 	}
 	return items, nil
 }
+
+func (r *fakeUserRestaurantRepo) IsSaved(_ context.Context, userID string, dataID string) (bool, error) {
+	for _, item := range r.saved {
+		if item.UserID == userID && item.DataID == dataID {
+			return true, nil
+		}
+	}
+	return false, nil
+}

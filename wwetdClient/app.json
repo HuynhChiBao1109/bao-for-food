@@ -11,6 +11,7 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "WWETD dùng vị trí để gợi ý quán ăn gần bạn kể cả khi bạn chọn luôn cho phép.",
         "NSLocationWhenInUseUsageDescription": "WWETD dùng vị trí hiện tại để gợi ý quán ăn gần bạn."
       }
     },
@@ -18,7 +19,8 @@
       "usesCleartextTraffic": true,
       "permissions": [
         "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION"
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION"
       ],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",

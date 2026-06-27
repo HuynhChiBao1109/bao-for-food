@@ -1,7 +1,8 @@
 import { useAuth } from '@/contexts/auth-context';
 import { API_BASE_URL } from '@/constants/api';
+import { Link } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Image, ScrollView, StyleSheet, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -47,22 +48,30 @@ export default function SavedRestaurantsScreen() {
       </ThemedText>
       <ScrollView contentContainerStyle={styles.list}>
         {items.map((item) => (
-          <View key={`${item.data_id}-${item.recorded_at}`} style={styles.card}>
-            {firstPhoto(item) ? <Image source={{ uri: firstPhoto(item) }} style={styles.image} /> : null}
-            <View style={styles.cardBody}>
-              <ThemedText style={styles.name}>{item.detail.title ?? 'Quán ăn'}</ThemedText>
-              <ThemedText style={styles.meta}>
-                {new Date(item.recorded_at).toLocaleTimeString('vi-VN', {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}
-                {item.detail.rating ? ` · ⭐ ${item.detail.rating}` : ''}
-              </ThemedText>
-              <ThemedText style={styles.address} numberOfLines={2}>
-                {item.detail.location?.address?.full ?? 'Chưa có địa chỉ'}
-              </ThemedText>
-            </View>
-          </View>
+          <Link
+            key={`${item.data_id}-${item.recorded_at}`}
+            href={{ pathname: '/restaurant-detail', params: { data_id: item.data_id } }}
+            asChild
+          >
+            <Pressable style={styles.card}>
+              {firstPhoto(item) ? (
+                <Image source={{ uri: firstPhoto(item) }} style={styles.image} />
+              ) : null}
+              <View style={styles.cardBody}>
+                <ThemedText style={styles.name}>{item.detail.title ?? 'Quán ăn'}</ThemedText>
+                <ThemedText style={styles.meta}>
+                  {new Date(item.recorded_at).toLocaleTimeString('vi-VN', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                  {item.detail.rating ? ` · ⭐ ${item.detail.rating}` : ''}
+                </ThemedText>
+                <ThemedText style={styles.address} numberOfLines={2}>
+                  {item.detail.location?.address?.full ?? 'Chưa có địa chỉ'}
+                </ThemedText>
+              </View>
+            </Pressable>
+          </Link>
         ))}
         {items.length === 0 ? (
           <ThemedText style={styles.empty}>Bạn chưa lưu quán nào.</ThemedText>

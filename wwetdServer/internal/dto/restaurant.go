@@ -43,6 +43,13 @@ type PickRestaurantResponse struct {
 	Source       string          `json:"source"`
 	DetailSource string          `json:"detail_source"`
 	Restaurant   json.RawMessage `json:"restaurant"`
+	IsSaved      bool            `json:"is_saved,omitempty"`
+}
+
+type RestaurantDetailResponse struct {
+	DetailSource string          `json:"detail_source"`
+	Restaurant   json.RawMessage `json:"restaurant"`
+	IsSaved      bool            `json:"is_saved,omitempty"`
 }
 
 type UserRestaurantItem struct {
