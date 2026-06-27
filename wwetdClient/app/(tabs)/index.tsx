@@ -24,21 +24,21 @@ export default function HomeScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      {/* <Link href="/rate-food" asChild>
-        <Pressable style={styles.card}>
-          <ThemedText type="title" style={styles.cardTitle}>
-            🍽️ Đánh giá món ăn
-          </ThemedText>
-          <ThemedText style={styles.cardDesc}>Chia sẻ cảm nhận về món bạn vừa ăn</ThemedText>
-        </Pressable>
-      </Link> */}
-
       <Link href="/today-eat" asChild>
         <Pressable style={styles.card}>
           <ThemedText type="title" style={styles.cardTitle}>
             👀 Hôm nay ăn gì
           </ThemedText>
           <ThemedText style={styles.cardDesc}>Anh ơi bữa nay ăn gì</ThemedText>
+        </Pressable>
+      </Link>
+
+      <Link href="/rate-food" asChild>
+        <Pressable style={styles.card}>
+          <ThemedText type="title" style={styles.cardTitle}>
+            🍽️ Địa chỉ bạn đã xem hôm nay
+          </ThemedText>
+          <ThemedText style={styles.cardDesc}>Địa chỉ bạn đã xem hôm nay</ThemedText>
         </Pressable>
       </Link>
 
