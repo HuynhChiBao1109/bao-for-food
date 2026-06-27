@@ -10,6 +10,7 @@ import (
 )
 
 type Dependencies struct {
+	Auth        *handler.AuthHandler
 	Health      *handler.HealthHandler
 	Users       *handler.UserHandler
 	Restaurants *handler.RestaurantHandler
@@ -27,6 +28,14 @@ func New(cfg config.Config, deps Dependencies) *gin.Engine {
 	api := engine.Group("/api/v1")
 	{
 		api.GET("/health", deps.Health.Check)
+
+		auth := api.Group("/auth")
+		{
+			auth.POST("/register", deps.Auth.Register)
+			auth.POST("/login", deps.Auth.Login)
+			auth.POST("/otp/request", deps.Auth.RequestOTP)
+			auth.POST("/otp/verify", deps.Auth.VerifyOTP)
+		}
 
 		users := api.Group("/users")
 		{

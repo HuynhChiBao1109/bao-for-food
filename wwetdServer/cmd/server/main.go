@@ -66,6 +66,11 @@ func main() {
 		log.Fatalf("ensure user indexes: %v", err)
 	}
 
+	authRepo := repository.NewMongoAuthRepository(mongoClient.Collection("auth_users"))
+	if err := authRepo.EnsureIndexes(initCtx); err != nil {
+		log.Fatalf("ensure auth indexes: %v", err)
+	}
+
 	restaurantRepo := repository.NewMongoRestaurantRepository(mongoClient.Collection("restaurant_details"))
 	if err := restaurantRepo.EnsureIndexes(initCtx); err != nil {
 		log.Fatalf("ensure restaurant indexes: %v", err)
@@ -81,6 +86,7 @@ func main() {
 
 	pisoClient := piso.NewClient(cfg.Piso)
 
+	authService := service.NewAuthService(authRepo, redisClient)
 	userService := service.NewUserService(userRepo, redisClient, cfg.Cache.UserTTL, cfg.WebSocket.RedisChannel)
 	restaurantService := service.NewRestaurantService(redisClient, pisoClient, restaurantRepo, cfg.Cache.LocationTTL)
 	healthService := service.NewHealthService(map[string]interfaces.Pinger{
@@ -88,12 +94,14 @@ func main() {
 		"redis":   redisClient,
 	})
 
+	authHandler := handler.NewAuthHandler(authService)
 	healthHandler := handler.NewHealthHandler(healthService)
 	userHandler := handler.NewUserHandler(userService)
 	restaurantHandler := handler.NewRestaurantHandler(restaurantService)
 	webSocketHandler := handler.NewWebSocketHandler(hub)
 
 	engine := router.New(cfg, router.Dependencies{
+		Auth:        authHandler,
 		Health:      healthHandler,
 		Users:       userHandler,
 		Restaurants: restaurantHandler,

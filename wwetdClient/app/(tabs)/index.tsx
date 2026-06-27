@@ -1,25 +1,94 @@
 import { useEffect, useState } from 'react';
-import { Modal, Pressable, StyleSheet, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { Link } from 'expo-router';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { useAuth } from '@/contexts/auth-context';
 import { useCurrentLocation } from '@/contexts/location-context';
+
+type AuthMode = 'intro' | 'login' | 'register' | 'otp';
 
 export default function HomeScreen() {
   const { coordinates, loading, permissionStatus, requestCurrentLocation } = useCurrentLocation();
+  const {
+    booting: authBooting,
+    login,
+    register,
+    requestOTP,
+    shouldAskLogin,
+    skipLoginPrompt,
+    user,
+    verifyOTP,
+  } = useAuth();
   const [showLocationPopup, setShowLocationPopup] = useState(false);
+  const [showLoginPopup, setShowLoginPopup] = useState(false);
+  const [authMode, setAuthMode] = useState<AuthMode>('intro');
+  const [phone, setPhone] = useState('');
+  const [password, setPassword] = useState('');
+  const [otp, setOtp] = useState('');
+  const [debugOtp, setDebugOtp] = useState<string | null>(null);
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!coordinates && !permissionStatus) {
+    async function checkLoginPrompt() {
+      if (!authBooting && !user && (await shouldAskLogin())) {
+        setShowLoginPopup(true);
+      }
+    }
+
+    checkLoginPrompt();
+  }, [authBooting, shouldAskLogin, user]);
+
+  useEffect(() => {
+    if (!showLoginPopup && !coordinates && !permissionStatus) {
       const timer = setTimeout(() => setShowLocationPopup(true), 450);
       return () => clearTimeout(timer);
     }
-  }, [coordinates, permissionStatus]);
+  }, [coordinates, permissionStatus, showLoginPopup]);
 
   const askLocation = async () => {
     await requestCurrentLocation();
     setShowLocationPopup(false);
+  };
+
+  const closeLoginForToday = async () => {
+    await skipLoginPrompt();
+    setShowLoginPopup(false);
+  };
+
+  const submitLogin = async () => {
+    setAuthLoading(true);
+    setAuthError(null);
+    try {
+      if (authMode === 'register') {
+        await register(phone, password);
+      } else if (authMode === 'otp') {
+        await verifyOTP(phone, otp);
+      } else {
+        await login(phone, password);
+      }
+      setShowLoginPopup(false);
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : 'Không đăng nhập được');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const submitRequestOTP = async () => {
+    setAuthLoading(true);
+    setAuthError(null);
+    try {
+      const response = await requestOTP(phone);
+      setDebugOtp(response.debug_otp ?? null);
+      setAuthMode('otp');
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : 'Không gửi được OTP');
+    } finally {
+      setAuthLoading(false);
+    }
   };
 
   return (
@@ -62,6 +131,113 @@ export default function HomeScreen() {
             <Pressable style={styles.skipBtn} onPress={() => setShowLocationPopup(false)}>
               <ThemedText style={styles.skipText}>Để sau</ThemedText>
             </Pressable>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal transparent visible={showLoginPopup} animationType="fade">
+        <View style={styles.overlay}>
+          <View style={styles.popup}>
+            {authMode === 'intro' ? (
+              <>
+                <ThemedText type="title" style={styles.popupTitle}>
+                  Đăng nhập để trải nghiệm tốt hơn
+                </ThemedText>
+                <ThemedText style={styles.popupDesc}>
+                  Lưu lịch sử quán đã xem, gợi ý hợp gu hơn và dùng OTP khi cần đăng nhập nhanh.
+                </ThemedText>
+
+                <Pressable style={styles.allowBtn} onPress={() => setAuthMode('login')}>
+                  <ThemedText style={styles.allowText}>Đăng nhập</ThemedText>
+                </Pressable>
+
+                <Pressable style={styles.skipBtn} onPress={closeLoginForToday}>
+                  <ThemedText style={styles.skipText}>Để sau, nhắc lại sau 24 giờ</ThemedText>
+                </Pressable>
+              </>
+            ) : (
+              <>
+                <ThemedText type="title" style={styles.popupTitle}>
+                  {authMode === 'register'
+                    ? 'Tạo tài khoản'
+                    : authMode === 'otp'
+                      ? 'Nhập OTP'
+                      : 'Đăng nhập'}
+                </ThemedText>
+
+                <TextInput
+                  keyboardType="phone-pad"
+                  onChangeText={setPhone}
+                  placeholder="Số điện thoại"
+                  placeholderTextColor="#8a9678"
+                  style={styles.input}
+                  value={phone}
+                />
+
+                {authMode === 'otp' ? (
+                  <>
+                    <TextInput
+                      keyboardType="number-pad"
+                      maxLength={6}
+                      onChangeText={setOtp}
+                      placeholder="Mã OTP"
+                      placeholderTextColor="#8a9678"
+                      style={styles.input}
+                      value={otp}
+                    />
+                    {debugOtp ? (
+                      <ThemedText style={styles.debugOtp}>OTP dev: {debugOtp}</ThemedText>
+                    ) : null}
+                  </>
+                ) : (
+                  <TextInput
+                    onChangeText={setPassword}
+                    placeholder="Mật khẩu"
+                    placeholderTextColor="#8a9678"
+                    secureTextEntry
+                    style={styles.input}
+                    value={password}
+                  />
+                )}
+
+                {authError ? <ThemedText style={styles.errorText}>{authError}</ThemedText> : null}
+
+                <Pressable style={styles.allowBtn} onPress={submitLogin} disabled={authLoading}>
+                  <ThemedText style={styles.allowText}>
+                    {authLoading
+                      ? 'Đang xử lý...'
+                      : authMode === 'register'
+                        ? 'Đăng ký'
+                        : authMode === 'otp'
+                          ? 'Xác thực OTP'
+                          : 'Đăng nhập'}
+                  </ThemedText>
+                </Pressable>
+
+                {authMode === 'login' ? (
+                  <Pressable style={styles.secondaryBtn} onPress={submitRequestOTP} disabled={authLoading}>
+                    <ThemedText style={styles.skipText}>Đăng nhập bằng OTP</ThemedText>
+                  </Pressable>
+                ) : null}
+
+                <Pressable
+                  style={styles.secondaryBtn}
+                  onPress={() => {
+                    setAuthError(null);
+                    setDebugOtp(null);
+                    setAuthMode(authMode === 'register' ? 'login' : 'register');
+                  }}
+                >
+                  <ThemedText style={styles.skipText}>
+                    {authMode === 'register' ? 'Tôi đã có tài khoản' : 'Tạo tài khoản mới'}
+                  </ThemedText>
+                </Pressable>
+
+                <Pressable style={styles.skipBtn} onPress={closeLoginForToday}>
+                  <ThemedText style={styles.skipText}>Để sau</ThemedText>
+                </Pressable>
+              </>
+            )}
           </View>
         </View>
       </Modal>
@@ -139,5 +315,30 @@ const styles = StyleSheet.create({
   skipText: {
     color: '#496a24',
     fontWeight: '800',
+  },
+  secondaryBtn: {
+    alignItems: 'center',
+    paddingTop: 13,
+  },
+  input: {
+    backgroundColor: '#eef6df',
+    borderRadius: 14,
+    color: '#21320f',
+    fontSize: 16,
+    marginBottom: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+  },
+  errorText: {
+    color: '#c2410c',
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 10,
+  },
+  debugOtp: {
+    color: '#667653',
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 10,
   },
 });
