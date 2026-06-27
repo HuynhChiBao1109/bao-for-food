@@ -1,0 +1,24 @@
+services:
+  mongo:
+    image: mongo:7
+    container_name: wwetd-mongo
+    restart: unless-stopped
+    command: ["mongod", "--auth", "--bind_ip_all"]
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: "1234"
+      MONGO_INITDB_DATABASE: wwetd
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+  redis:
+    image: redis:7-alpine
+    container_name: wwetd-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+
+volumes:
+  mongo_data:
