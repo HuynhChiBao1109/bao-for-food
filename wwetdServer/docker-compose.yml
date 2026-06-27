@@ -13,12 +13,12 @@ services:
     volumes:
       - mongo_data:/data/db
 
-  redis:
-    image: redis:7-alpine
-    container_name: wwetd-redis
-    restart: unless-stopped
-    ports:
-      - "6379:6379"
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: wwetd-redis
+  #   restart: unless-stopped
+  #   ports:
+  #     - "6379:6379"
 
 volumes:
   mongo_data:

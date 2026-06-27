@@ -23,16 +23,18 @@ const (
 )
 
 type restaurantService struct {
-	cache       cache.Store
-	piso        interfaces.PisoSearcher
-	locationTTL time.Duration
+	cache          cache.Store
+	piso           interfaces.PisoSearcher
+	locationTTL    time.Duration
+	placeDetailTTL time.Duration
 }
 
-func NewRestaurantService(cacheStore cache.Store, pisoSearcher interfaces.PisoSearcher, locationTTL time.Duration) interfaces.RestaurantService {
+func NewRestaurantService(cacheStore cache.Store, pisoSearcher interfaces.PisoSearcher, locationTTL time.Duration, placeDetailTTL time.Duration) interfaces.RestaurantService {
 	return &restaurantService{
-		cache:       cacheStore,
-		piso:        pisoSearcher,
-		locationTTL: locationTTL,
+		cache:          cacheStore,
+		piso:           pisoSearcher,
+		locationTTL:    locationTTL,
+		placeDetailTTL: placeDetailTTL,
 	}
 }
 
@@ -84,10 +86,22 @@ func (s *restaurantService) PickNearby(ctx context.Context, query dto.NearbyRest
 		return dto.PickRestaurantResponse{}, err
 	}
 
+	selected := restaurants[index]
+	dataID, err := extractDataID(selected)
+	if err != nil {
+		return dto.PickRestaurantResponse{}, err
+	}
+
+	detail, detailSource, err := s.getPlaceDetail(ctx, dataID, nearby.Location)
+	if err != nil {
+		return dto.PickRestaurantResponse{}, err
+	}
+
 	return dto.PickRestaurantResponse{
-		Location:   nearby.Location,
-		Source:     nearby.Source,
-		Restaurant: restaurants[index],
+		Location:     nearby.Location,
+		Source:       nearby.Source,
+		DetailSource: detailSource,
+		Restaurant:   detail,
 	}, nil
 }
 
@@ -142,6 +156,10 @@ func (s *restaurantService) cacheLocation(ctx context.Context, location dto.Clie
 
 func locationCacheKey(ip string) string {
 	return fmt.Sprintf("locations:ip:%s", ip)
+}
+
+func placeDetailCacheKey(dataID string) string {
+	return fmt.Sprintf("places:detail:%s", dataID)
 }
 
 func normalizeIP(value string) string {
@@ -214,6 +232,59 @@ func extractRestaurants(payload json.RawMessage) ([]json.RawMessage, error) {
 		}
 		return nil, domain.ErrRestaurantNotFound
 	}
+}
+
+func extractDataID(payload json.RawMessage) (string, error) {
+	var restaurant struct {
+		DataID string `json:"data_id"`
+	}
+
+	if err := json.Unmarshal(payload, &restaurant); err != nil {
+		return "", err
+	}
+	if strings.TrimSpace(restaurant.DataID) == "" {
+		return "", domain.ErrRestaurantNotFound
+	}
+
+	return restaurant.DataID, nil
+}
+
+func (s *restaurantService) getPlaceDetail(ctx context.Context, dataID string, location dto.ClientLocation) (json.RawMessage, string, error) {
+	if s.cache != nil {
+		payload, err := s.cache.Get(ctx, placeDetailCacheKey(dataID))
+		if err == nil && json.Valid([]byte(payload)) {
+			return normalizePlaceDetail(json.RawMessage(payload)), "cache", nil
+		}
+	}
+
+	detail, err := s.piso.Place(ctx, dto.PisoPlaceParams{
+		DataID: dataID,
+		Lat:    location.Lat,
+		Lng:    location.Lng,
+	})
+	if err != nil {
+		return nil, "", err
+	}
+
+	detail = normalizePlaceDetail(detail)
+
+	if s.cache != nil && s.placeDetailTTL > 0 {
+		_ = s.cache.Set(ctx, placeDetailCacheKey(dataID), string(detail), s.placeDetailTTL)
+	}
+
+	return detail, "piso", nil
+}
+
+func normalizePlaceDetail(payload json.RawMessage) json.RawMessage {
+	var wrapped struct {
+		PlaceResult json.RawMessage `json:"place_result"`
+	}
+
+	if err := json.Unmarshal(payload, &wrapped); err == nil && len(wrapped.PlaceResult) > 0 {
+		return wrapped.PlaceResult
+	}
+
+	return payload
 }
 
 func randomIndex(length int) (int, error) {

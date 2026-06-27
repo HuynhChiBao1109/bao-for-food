@@ -12,8 +12,8 @@ import (
 func TestRestaurantServiceSearchNearbyGeneratesCachesAndCallsPiso(t *testing.T) {
 	ctx := context.Background()
 	cacheStore := newFakeCache()
-	piso := &fakePisoSearcher{response: json.RawMessage(`{"local_result":[]}`)}
-	svc := NewRestaurantService(cacheStore, piso, time.Hour)
+	piso := &fakePisoSearcher{searchResponse: json.RawMessage(`{"local_result":[]}`)}
+	svc := NewRestaurantService(cacheStore, piso, time.Hour, time.Hour)
 
 	result, err := svc.SearchNearby(ctx, dto.NearbyRestaurantsQuery{
 		IP:    "8.8.8.8",
@@ -27,14 +27,14 @@ func TestRestaurantServiceSearchNearbyGeneratesCachesAndCallsPiso(t *testing.T) 
 	if result.Source != "generated" {
 		t.Fatalf("expected generated location source, got %q", result.Source)
 	}
-	if len(piso.calls) != 1 {
-		t.Fatalf("expected one piso call, got %d", len(piso.calls))
+	if len(piso.searchCalls) != 1 {
+		t.Fatalf("expected one piso search call, got %d", len(piso.searchCalls))
 	}
-	if piso.calls[0].Query != "phở" {
-		t.Fatalf("expected query phở, got %q", piso.calls[0].Query)
+	if piso.searchCalls[0].Query != "phở" {
+		t.Fatalf("expected query phở, got %q", piso.searchCalls[0].Query)
 	}
-	if piso.calls[0].Limit != 10 {
-		t.Fatalf("expected limit 10, got %d", piso.calls[0].Limit)
+	if piso.searchCalls[0].Limit != 10 {
+		t.Fatalf("expected limit 10, got %d", piso.searchCalls[0].Limit)
 	}
 	if _, ok := cacheStore.values[locationCacheKey("8.8.8.8")]; !ok {
 		t.Fatalf("expected generated location to be cached")
@@ -51,8 +51,8 @@ func TestRestaurantServiceSearchNearbyUsesCachedLocation(t *testing.T) {
 	}
 	cacheStore.values[locationCacheKey("8.8.4.4")] = string(payload)
 
-	piso := &fakePisoSearcher{response: json.RawMessage(`{"local_result":[]}`)}
-	svc := NewRestaurantService(cacheStore, piso, time.Hour)
+	piso := &fakePisoSearcher{searchResponse: json.RawMessage(`{"local_result":[]}`)}
+	svc := NewRestaurantService(cacheStore, piso, time.Hour, time.Hour)
 
 	result, err := svc.SearchNearby(ctx, dto.NearbyRestaurantsQuery{IP: "8.8.4.4"})
 	if err != nil {
@@ -62,24 +62,27 @@ func TestRestaurantServiceSearchNearbyUsesCachedLocation(t *testing.T) {
 	if result.Source != "cache" {
 		t.Fatalf("expected cache location source, got %q", result.Source)
 	}
-	if len(piso.calls) != 1 {
-		t.Fatalf("expected one piso call, got %d", len(piso.calls))
+	if len(piso.searchCalls) != 1 {
+		t.Fatalf("expected one piso search call, got %d", len(piso.searchCalls))
 	}
-	if piso.calls[0].Lat != cachedLocation.Lat || piso.calls[0].Lng != cachedLocation.Lng {
-		t.Fatalf("expected cached coordinates, got lat=%f lng=%f", piso.calls[0].Lat, piso.calls[0].Lng)
+	if piso.searchCalls[0].Lat != cachedLocation.Lat || piso.searchCalls[0].Lng != cachedLocation.Lng {
+		t.Fatalf("expected cached coordinates, got lat=%f lng=%f", piso.searchCalls[0].Lat, piso.searchCalls[0].Lng)
 	}
 }
 
 func TestRestaurantServicePickNearbyReturnsOneRestaurant(t *testing.T) {
 	ctx := context.Background()
 	cacheStore := newFakeCache()
-	piso := &fakePisoSearcher{response: json.RawMessage(`{
+	piso := &fakePisoSearcher{
+		searchResponse: json.RawMessage(`{
 		"local_result": [
-			{"title": "Quán A"},
-			{"title": "Quán B"}
+			{"data_id": "place-a", "title": "Quán A"},
+			{"data_id": "place-b", "title": "Quán B"}
 		]
-	}`)}
-	svc := NewRestaurantService(cacheStore, piso, time.Hour)
+	}`),
+		placeResponse: json.RawMessage(`{"data_id": "place-a", "title": "Quán A detail"}`),
+	}
+	svc := NewRestaurantService(cacheStore, piso, time.Hour, time.Hour)
 
 	result, err := svc.PickNearby(ctx, dto.NearbyRestaurantsQuery{IP: "8.8.8.8"})
 	if err != nil {
@@ -90,17 +93,33 @@ func TestRestaurantServicePickNearbyReturnsOneRestaurant(t *testing.T) {
 	if err := json.Unmarshal(result.Restaurant, &restaurant); err != nil {
 		t.Fatalf("unmarshal restaurant: %v", err)
 	}
-	if restaurant["title"] == "" {
-		t.Fatalf("expected restaurant title")
+	if restaurant["title"] != "Quán A detail" {
+		t.Fatalf("expected restaurant detail title, got %v", restaurant["title"])
+	}
+	if result.DetailSource != "piso" {
+		t.Fatalf("expected detail source piso, got %q", result.DetailSource)
+	}
+	if len(piso.placeCalls) != 1 {
+		t.Fatalf("expected one piso place call, got %d", len(piso.placeCalls))
+	}
+	if _, ok := cacheStore.values[placeDetailCacheKey(piso.placeCalls[0].DataID)]; !ok {
+		t.Fatalf("expected place detail to be cached")
 	}
 }
 
 type fakePisoSearcher struct {
-	response json.RawMessage
-	calls    []dto.PisoSearchParams
+	searchResponse json.RawMessage
+	placeResponse  json.RawMessage
+	searchCalls    []dto.PisoSearchParams
+	placeCalls     []dto.PisoPlaceParams
 }
 
 func (s *fakePisoSearcher) Search(_ context.Context, params dto.PisoSearchParams) (json.RawMessage, error) {
-	s.calls = append(s.calls, params)
-	return s.response, nil
+	s.searchCalls = append(s.searchCalls, params)
+	return s.searchResponse, nil
+}
+
+func (s *fakePisoSearcher) Place(_ context.Context, params dto.PisoPlaceParams) (json.RawMessage, error) {
+	s.placeCalls = append(s.placeCalls, params)
+	return s.placeResponse, nil
 }

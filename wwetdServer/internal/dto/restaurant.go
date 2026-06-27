@@ -25,6 +25,12 @@ type PisoSearchParams struct {
 	Limit int
 }
 
+type PisoPlaceParams struct {
+	DataID string
+	Lat    float64
+	Lng    float64
+}
+
 type NearbyRestaurantsResponse struct {
 	Location ClientLocation  `json:"location"`
 	Source   string          `json:"source"`
@@ -32,7 +38,8 @@ type NearbyRestaurantsResponse struct {
 }
 
 type PickRestaurantResponse struct {
-	Location   ClientLocation  `json:"location"`
-	Source     string          `json:"source"`
-	Restaurant json.RawMessage `json:"restaurant"`
+	Location     ClientLocation  `json:"location"`
+	Source       string          `json:"source"`
+	DetailSource string          `json:"detail_source"`
+	Restaurant   json.RawMessage `json:"restaurant"`
 }

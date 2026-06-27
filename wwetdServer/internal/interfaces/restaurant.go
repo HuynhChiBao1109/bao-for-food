@@ -9,6 +9,7 @@ import (
 
 type PisoSearcher interface {
 	Search(ctx context.Context, params dto.PisoSearchParams) (json.RawMessage, error)
+	Place(ctx context.Context, params dto.PisoPlaceParams) (json.RawMessage, error)
 }
 
 type RestaurantService interface {

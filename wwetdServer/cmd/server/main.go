@@ -77,7 +77,7 @@ func main() {
 	pisoClient := piso.NewClient(cfg.Piso)
 
 	userService := service.NewUserService(userRepo, redisClient, cfg.Cache.UserTTL, cfg.WebSocket.RedisChannel)
-	restaurantService := service.NewRestaurantService(redisClient, pisoClient, cfg.Cache.LocationTTL)
+	restaurantService := service.NewRestaurantService(redisClient, pisoClient, cfg.Cache.LocationTTL, cfg.Cache.PlaceDetailTTL)
 	healthService := service.NewHealthService(map[string]interfaces.Pinger{
 		"mongodb": mongoClient,
 		"redis":   redisClient,
