@@ -1,35 +1,110 @@
 import { View, StyleSheet, Animated, Image, ScrollView, Pressable, Modal } from 'react-native';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { API_BASE_URL } from '@/constants/api';
 
 const PRIMARY = '#a7c068';
 
 const ALL_ICONS = ['🍜', '🍕', '🥗', '🍔', '🍣', '🥪', '🍰', '🍛', '🍗', '🍩'];
 
-const MOCK_RESTAURANT = {
-  name: 'Quán Bún Bò Huế O Hạnh',
-  images: [
-    'https://images.unsplash.com/photo-1551218808-94e220e084d2',
-    'https://images.unsplash.com/photo-1540189549336-e6e99c3679fe',
-    'https://images.unsplash.com/photo-1604908177522-429a2d9abbd6',
-  ],
-  address: '12 Nguyễn Trãi, Quận 1, TP.HCM',
-  open: '07:00',
-  close: '22:00',
-  menu: ['Bún bò huế', 'Chả cua', 'Giò heo', 'Bún đặc biệt'],
-  rating: 4.6,
-  reviews: ['Ngon, đúng vị Huế', 'Nước lèo đậm đà', 'Sẽ quay lại lần sau'],
+const FALLBACK_IMAGES = [
+  'https://images.unsplash.com/photo-1551218808-94e220e084d2',
+  'https://images.unsplash.com/photo-1540189549336-e6e99c3679fe',
+  'https://images.unsplash.com/photo-1604908177522-429a2d9abbd6',
+];
+
+type PisoRestaurant = {
+  title?: string;
+  type?: string;
+  rating?: number;
+  reviews?: number;
+  contacts?: {
+    phone?: string;
+    website?: string;
+  };
+  location?: {
+    address?: {
+      full?: string;
+    };
+    latitude?: number;
+    longitude?: number;
+  };
+  open_state?: {
+    is_open_now?: boolean;
+    text?: string;
+  };
+  link_google_maps?: string;
+  link_place_detail?: string;
+  images?: string[];
+  photos?: (string | { url?: string; image_url?: string })[];
 };
+
+type TodayEatResponse = {
+  data: {
+    restaurant: PisoRestaurant;
+  };
+};
+
+function restaurantImages(restaurant?: PisoRestaurant) {
+  const photoURLs =
+    restaurant?.photos
+      ?.map((photo) => {
+        if (typeof photo === 'string') return photo;
+        return photo.url ?? photo.image_url;
+      })
+      .filter((url): url is string => Boolean(url)) ?? [];
+
+  const images = [...(restaurant?.images ?? []), ...photoURLs];
+  return images.length > 0 ? images : FALLBACK_IMAGES;
+}
 
 export default function TodayEatScreen() {
   const [startIndex, setStartIndex] = useState(0);
   const [dots, setDots] = useState('');
   const [loading, setLoading] = useState(true);
   const [showReason, setShowReason] = useState(false);
+  const [restaurant, setRestaurant] = useState<PisoRestaurant | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  const images = useMemo(() => restaurantImages(restaurant ?? undefined), [restaurant]);
+
+  const revealResult = useCallback(() => {
+    fadeAnim.setValue(0);
+    setLoading(false);
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 500,
+      useNativeDriver: true,
+    }).start();
+  }, [fadeAnim]);
+
+  const pickRestaurant = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const url = `${API_BASE_URL}/api/v1/restaurants/today?query=${encodeURIComponent(
+        'quán ăn',
+      )}&limit=20`;
+      const response = await fetch(url);
+
+      if (!response.ok) {
+        throw new Error('Không chọn được quán lúc này');
+      }
+
+      const payload = (await response.json()) as TodayEatResponse;
+      setRestaurant(payload.data.restaurant);
+    } catch (err) {
+      setRestaurant(null);
+      setError(err instanceof Error ? err.message : 'Không chọn được quán lúc này');
+    } finally {
+      revealResult();
+    }
+  }, [revealResult]);
 
   /** LOADING CAROUSEL */
   useEffect(() => {
@@ -53,7 +128,7 @@ export default function TodayEatScreen() {
     }, 900);
 
     return () => clearInterval(interval);
-  }, [loading]);
+  }, [loading, scaleAnim]);
 
   /** DOTS */
   useEffect(() => {
@@ -66,19 +141,9 @@ export default function TodayEatScreen() {
     return () => clearInterval(dotInterval);
   }, [loading]);
 
-  /** STOP AFTER 10s */
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setLoading(false);
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 500,
-        useNativeDriver: true,
-      }).start();
-    }, 5000);
-
-    return () => clearTimeout(timer);
-  }, []);
+    pickRestaurant();
+  }, [pickRestaurant]);
 
   const visibleIcons = Array.from({ length: 5 }).map(
     (_, i) => ALL_ICONS[(startIndex + i) % ALL_ICONS.length],
@@ -112,42 +177,62 @@ export default function TodayEatScreen() {
         </View>
       ) : (
         <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
-          <ScrollView showsVerticalScrollIndicator={false}>
-            {/* IMAGES */}
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              {MOCK_RESTAURANT.images.map((img, i) => (
-                <Image key={i} source={{ uri: img }} style={styles.image} />
-              ))}
-            </ScrollView>
-
-            <View style={styles.content}>
+          {error ? (
+            <View style={styles.errorBox}>
               <ThemedText type="title" style={styles.title}>
-                🍜 {MOCK_RESTAURANT.name}
+                Chưa chọn được quán
               </ThemedText>
-
-              <ThemedText style={styles.info}>📍 {MOCK_RESTAURANT.address}</ThemedText>
-
-              <ThemedText style={styles.info}>
-                ⏰ {MOCK_RESTAURANT.open} – {MOCK_RESTAURANT.close}
-              </ThemedText>
-
-              <ThemedText style={styles.info}>⭐ {MOCK_RESTAURANT.rating} / 5</ThemedText>
-
-              <ThemedText style={styles.section}>🍽️ Menu</ThemedText>
-              {MOCK_RESTAURANT.menu.map((m) => (
-                <ThemedText key={m} style={styles.item}>
-                  • {m}
-                </ThemedText>
-              ))}
-
-              <ThemedText style={styles.section}>💬 Đánh giá</ThemedText>
-              {MOCK_RESTAURANT.reviews.map((r, i) => (
-                <View key={i} style={styles.reviewBox}>
-                  <ThemedText style={styles.review}>“{r}”</ThemedText>
-                </View>
-              ))}
+              <ThemedText style={styles.info}>{error}</ThemedText>
             </View>
-          </ScrollView>
+          ) : (
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                {images.map((img, i) => (
+                  <Image key={`${img}-${i}`} source={{ uri: img }} style={styles.image} />
+                ))}
+              </ScrollView>
+
+              <View style={styles.content}>
+                <ThemedText type="title" style={styles.title}>
+                  🍜 {restaurant?.title ?? 'Quán ăn hôm nay'}
+                </ThemedText>
+
+                <ThemedText style={styles.info}>
+                  📍 {restaurant?.location?.address?.full ?? 'Chưa có địa chỉ'}
+                </ThemedText>
+
+                {restaurant?.open_state?.text ? (
+                  <ThemedText style={styles.info}>⏰ {restaurant.open_state.text}</ThemedText>
+                ) : null}
+
+                {restaurant?.rating ? (
+                  <ThemedText style={styles.info}>
+                    ⭐ {restaurant.rating} / 5
+                    {restaurant.reviews ? ` (${restaurant.reviews} đánh giá)` : ''}
+                  </ThemedText>
+                ) : null}
+
+                {restaurant?.type ? (
+                  <>
+                    <ThemedText style={styles.section}>🍽️ Loại quán</ThemedText>
+                    <ThemedText style={styles.item}>• {restaurant.type}</ThemedText>
+                  </>
+                ) : null}
+
+                {restaurant?.contacts?.phone || restaurant?.contacts?.website ? (
+                  <>
+                    <ThemedText style={styles.section}>📞 Liên hệ</ThemedText>
+                    {restaurant.contacts.phone ? (
+                      <ThemedText style={styles.item}>• {restaurant.contacts.phone}</ThemedText>
+                    ) : null}
+                    {restaurant.contacts.website ? (
+                      <ThemedText style={styles.item}>• {restaurant.contacts.website}</ThemedText>
+                    ) : null}
+                  </>
+                ) : null}
+              </View>
+            </ScrollView>
+          )}
 
           {/* FOOTER */}
           <View style={styles.footer}>
@@ -176,8 +261,8 @@ export default function TodayEatScreen() {
                 style={styles.reasonBtn}
                 onPress={() => {
                   setShowReason(false);
-                  setLoading(true);
                   setStartIndex(0);
+                  pickRestaurant();
                 }}
               >
                 <ThemedText>{r}</ThemedText>
@@ -212,6 +297,12 @@ const styles = StyleSheet.create({
   },
 
   content: { padding: 16 },
+
+  errorBox: {
+    flex: 1,
+    justifyContent: 'center',
+    padding: 24,
+  },
 
   title: { color: '#fff', marginBottom: 6 },
 
