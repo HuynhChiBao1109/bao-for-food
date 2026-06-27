@@ -24,14 +24,14 @@ export default function HomeScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <Link href="/rate-food" asChild>
+      {/* <Link href="/rate-food" asChild>
         <Pressable style={styles.card}>
           <ThemedText type="title" style={styles.cardTitle}>
             🍽️ Đánh giá món ăn
           </ThemedText>
           <ThemedText style={styles.cardDesc}>Chia sẻ cảm nhận về món bạn vừa ăn</ThemedText>
         </Pressable>
-      </Link>
+      </Link> */}
 
       <Link href="/today-eat" asChild>
         <Pressable style={styles.card}>

@@ -51,9 +51,8 @@ type RedisConfig struct {
 }
 
 type CacheConfig struct {
-	UserTTL        time.Duration
-	LocationTTL    time.Duration
-	PlaceDetailTTL time.Duration
+	UserTTL     time.Duration
+	LocationTTL time.Duration
 }
 
 type PisoConfig struct {
@@ -90,11 +89,6 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 
-	placeDetailTTL, err := getEnvAsDuration("PLACE_DETAIL_CACHE_TTL", 24*time.Hour)
-	if err != nil {
-		return Config{}, err
-	}
-
 	pisoTimeout, err := getEnvAsDuration("PISO_TIMEOUT", 8*time.Second)
 	if err != nil {
 		return Config{}, err
@@ -121,9 +115,8 @@ func Load() (Config, error) {
 			DB:       redisDB,
 		},
 		Cache: CacheConfig{
-			UserTTL:        userTTL,
-			LocationTTL:    locationTTL,
-			PlaceDetailTTL: placeDetailTTL,
+			UserTTL:     userTTL,
+			LocationTTL: locationTTL,
 		},
 		Piso: PisoConfig{
 			APIKey:  getEnv("PISO_API_KEY", ""),

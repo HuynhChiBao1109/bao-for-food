@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"hash/fnv"
 	"math"
@@ -16,6 +17,7 @@ import (
 	"wwetd-server/internal/domain"
 	"wwetd-server/internal/dto"
 	"wwetd-server/internal/interfaces"
+	"wwetd-server/internal/repository"
 )
 
 const (
@@ -23,18 +25,18 @@ const (
 )
 
 type restaurantService struct {
-	cache          cache.Store
-	piso           interfaces.PisoSearcher
-	locationTTL    time.Duration
-	placeDetailTTL time.Duration
+	cache       cache.Store
+	piso        interfaces.PisoSearcher
+	restaurants repository.RestaurantRepository
+	locationTTL time.Duration
 }
 
-func NewRestaurantService(cacheStore cache.Store, pisoSearcher interfaces.PisoSearcher, locationTTL time.Duration, placeDetailTTL time.Duration) interfaces.RestaurantService {
+func NewRestaurantService(cacheStore cache.Store, pisoSearcher interfaces.PisoSearcher, restaurantRepo repository.RestaurantRepository, locationTTL time.Duration) interfaces.RestaurantService {
 	return &restaurantService{
-		cache:          cacheStore,
-		piso:           pisoSearcher,
-		locationTTL:    locationTTL,
-		placeDetailTTL: placeDetailTTL,
+		cache:       cacheStore,
+		piso:        pisoSearcher,
+		restaurants: restaurantRepo,
+		locationTTL: locationTTL,
 	}
 }
 
@@ -158,10 +160,6 @@ func locationCacheKey(ip string) string {
 	return fmt.Sprintf("locations:ip:%s", ip)
 }
 
-func placeDetailCacheKey(dataID string) string {
-	return fmt.Sprintf("places:detail:%s", dataID)
-}
-
 func normalizeIP(value string) string {
 	host := strings.TrimSpace(value)
 	if host == "" {
@@ -250,10 +248,13 @@ func extractDataID(payload json.RawMessage) (string, error) {
 }
 
 func (s *restaurantService) getPlaceDetail(ctx context.Context, dataID string, location dto.ClientLocation) (json.RawMessage, string, error) {
-	if s.cache != nil {
-		payload, err := s.cache.Get(ctx, placeDetailCacheKey(dataID))
-		if err == nil && json.Valid([]byte(payload)) {
-			return normalizePlaceDetail(json.RawMessage(payload)), "cache", nil
+	if s.restaurants != nil {
+		detail, err := s.restaurants.FindDetailByDataID(ctx, dataID)
+		if err == nil && json.Valid(detail.Detail) {
+			return normalizePlaceDetail(detail.Detail), "database", nil
+		}
+		if err != nil && !errors.Is(err, domain.ErrRestaurantNotFound) {
+			return nil, "", err
 		}
 	}
 
@@ -268,8 +269,13 @@ func (s *restaurantService) getPlaceDetail(ctx context.Context, dataID string, l
 
 	detail = normalizePlaceDetail(detail)
 
-	if s.cache != nil && s.placeDetailTTL > 0 {
-		_ = s.cache.Set(ctx, placeDetailCacheKey(dataID), string(detail), s.placeDetailTTL)
+	if s.restaurants != nil {
+		if err := s.restaurants.UpsertDetail(ctx, &domain.RestaurantDetail{
+			DataID: dataID,
+			Detail: detail,
+		}); err != nil {
+			return nil, "", err
+		}
 	}
 
 	return detail, "piso", nil

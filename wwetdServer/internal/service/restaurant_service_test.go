@@ -6,14 +6,16 @@ import (
 	"testing"
 	"time"
 
+	"wwetd-server/internal/domain"
 	"wwetd-server/internal/dto"
 )
 
 func TestRestaurantServiceSearchNearbyGeneratesCachesAndCallsPiso(t *testing.T) {
 	ctx := context.Background()
 	cacheStore := newFakeCache()
+	restaurantRepo := newFakeRestaurantRepo()
 	piso := &fakePisoSearcher{searchResponse: json.RawMessage(`{"local_result":[]}`)}
-	svc := NewRestaurantService(cacheStore, piso, time.Hour, time.Hour)
+	svc := NewRestaurantService(cacheStore, piso, restaurantRepo, time.Hour)
 
 	result, err := svc.SearchNearby(ctx, dto.NearbyRestaurantsQuery{
 		IP:    "8.8.8.8",
@@ -44,6 +46,7 @@ func TestRestaurantServiceSearchNearbyGeneratesCachesAndCallsPiso(t *testing.T) 
 func TestRestaurantServiceSearchNearbyUsesCachedLocation(t *testing.T) {
 	ctx := context.Background()
 	cacheStore := newFakeCache()
+	restaurantRepo := newFakeRestaurantRepo()
 	cachedLocation := dto.ClientLocation{IP: "8.8.4.4", Lat: 10.8, Lng: 106.7}
 	payload, err := json.Marshal(cachedLocation)
 	if err != nil {
@@ -52,7 +55,7 @@ func TestRestaurantServiceSearchNearbyUsesCachedLocation(t *testing.T) {
 	cacheStore.values[locationCacheKey("8.8.4.4")] = string(payload)
 
 	piso := &fakePisoSearcher{searchResponse: json.RawMessage(`{"local_result":[]}`)}
-	svc := NewRestaurantService(cacheStore, piso, time.Hour, time.Hour)
+	svc := NewRestaurantService(cacheStore, piso, restaurantRepo, time.Hour)
 
 	result, err := svc.SearchNearby(ctx, dto.NearbyRestaurantsQuery{IP: "8.8.4.4"})
 	if err != nil {
@@ -73,6 +76,7 @@ func TestRestaurantServiceSearchNearbyUsesCachedLocation(t *testing.T) {
 func TestRestaurantServicePickNearbyReturnsOneRestaurant(t *testing.T) {
 	ctx := context.Background()
 	cacheStore := newFakeCache()
+	restaurantRepo := newFakeRestaurantRepo()
 	piso := &fakePisoSearcher{
 		searchResponse: json.RawMessage(`{
 		"local_result": [
@@ -82,7 +86,7 @@ func TestRestaurantServicePickNearbyReturnsOneRestaurant(t *testing.T) {
 	}`),
 		placeResponse: json.RawMessage(`{"data_id": "place-a", "title": "Quán A detail"}`),
 	}
-	svc := NewRestaurantService(cacheStore, piso, time.Hour, time.Hour)
+	svc := NewRestaurantService(cacheStore, piso, restaurantRepo, time.Hour)
 
 	result, err := svc.PickNearby(ctx, dto.NearbyRestaurantsQuery{IP: "8.8.8.8"})
 	if err != nil {
@@ -102,8 +106,44 @@ func TestRestaurantServicePickNearbyReturnsOneRestaurant(t *testing.T) {
 	if len(piso.placeCalls) != 1 {
 		t.Fatalf("expected one piso place call, got %d", len(piso.placeCalls))
 	}
-	if _, ok := cacheStore.values[placeDetailCacheKey(piso.placeCalls[0].DataID)]; !ok {
-		t.Fatalf("expected place detail to be cached")
+	if _, ok := restaurantRepo.details[piso.placeCalls[0].DataID]; !ok {
+		t.Fatalf("expected place detail to be saved in repository")
+	}
+}
+
+func TestRestaurantServicePickNearbyUsesSavedRestaurantDetail(t *testing.T) {
+	ctx := context.Background()
+	cacheStore := newFakeCache()
+	restaurantRepo := newFakeRestaurantRepo()
+	restaurantRepo.details["place-a"] = json.RawMessage(`{"data_id": "place-a", "title": "Saved detail"}`)
+
+	piso := &fakePisoSearcher{
+		searchResponse: json.RawMessage(`{
+		"local_result": [
+			{"data_id": "place-a", "title": "Quán A"}
+		]
+	}`),
+		placeResponse: json.RawMessage(`{"data_id": "place-a", "title": "Piso detail"}`),
+	}
+	svc := NewRestaurantService(cacheStore, piso, restaurantRepo, time.Hour)
+
+	result, err := svc.PickNearby(ctx, dto.NearbyRestaurantsQuery{IP: "8.8.8.8"})
+	if err != nil {
+		t.Fatalf("PickNearby returned error: %v", err)
+	}
+
+	var restaurant map[string]interface{}
+	if err := json.Unmarshal(result.Restaurant, &restaurant); err != nil {
+		t.Fatalf("unmarshal restaurant: %v", err)
+	}
+	if restaurant["title"] != "Saved detail" {
+		t.Fatalf("expected saved restaurant detail, got %v", restaurant["title"])
+	}
+	if result.DetailSource != "database" {
+		t.Fatalf("expected detail source database, got %q", result.DetailSource)
+	}
+	if len(piso.placeCalls) != 0 {
+		t.Fatalf("expected no piso place call, got %d", len(piso.placeCalls))
 	}
 }
 
@@ -122,4 +162,29 @@ func (s *fakePisoSearcher) Search(_ context.Context, params dto.PisoSearchParams
 func (s *fakePisoSearcher) Place(_ context.Context, params dto.PisoPlaceParams) (json.RawMessage, error) {
 	s.placeCalls = append(s.placeCalls, params)
 	return s.placeResponse, nil
+}
+
+type fakeRestaurantRepo struct {
+	details map[string]json.RawMessage
+}
+
+func newFakeRestaurantRepo() *fakeRestaurantRepo {
+	return &fakeRestaurantRepo{details: make(map[string]json.RawMessage)}
+}
+
+func (r *fakeRestaurantRepo) FindDetailByDataID(_ context.Context, dataID string) (*domain.RestaurantDetail, error) {
+	detail, ok := r.details[dataID]
+	if !ok {
+		return nil, domain.ErrRestaurantNotFound
+	}
+
+	return &domain.RestaurantDetail{
+		DataID: dataID,
+		Detail: detail,
+	}, nil
+}
+
+func (r *fakeRestaurantRepo) UpsertDetail(_ context.Context, detail *domain.RestaurantDetail) error {
+	r.details[detail.DataID] = detail.Detail
+	return nil
 }

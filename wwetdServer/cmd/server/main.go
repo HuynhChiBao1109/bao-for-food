@@ -66,6 +66,11 @@ func main() {
 		log.Fatalf("ensure user indexes: %v", err)
 	}
 
+	restaurantRepo := repository.NewMongoRestaurantRepository(mongoClient.Collection("restaurant_details"))
+	if err := restaurantRepo.EnsureIndexes(initCtx); err != nil {
+		log.Fatalf("ensure restaurant indexes: %v", err)
+	}
+
 	hub := realtime.NewHub(cfg.WebSocket.AllowedOrigins)
 	go hub.Run(appCtx)
 
@@ -77,7 +82,7 @@ func main() {
 	pisoClient := piso.NewClient(cfg.Piso)
 
 	userService := service.NewUserService(userRepo, redisClient, cfg.Cache.UserTTL, cfg.WebSocket.RedisChannel)
-	restaurantService := service.NewRestaurantService(redisClient, pisoClient, cfg.Cache.LocationTTL, cfg.Cache.PlaceDetailTTL)
+	restaurantService := service.NewRestaurantService(redisClient, pisoClient, restaurantRepo, cfg.Cache.LocationTTL)
 	healthService := service.NewHealthService(map[string]interfaces.Pinger{
 		"mongodb": mongoClient,
 		"redis":   redisClient,
