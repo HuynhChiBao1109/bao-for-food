@@ -2,6 +2,7 @@ import { API_BASE_URL } from '@/constants/api';
 import { Fonts } from '@/constants/theme';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { useCurrentLocation } from '@/contexts/location-context';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
@@ -164,6 +165,7 @@ export default function TodayEatScreen() {
   const [restaurant, setRestaurant] = useState<PisoRestaurant | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
+  const { coordinates } = useCurrentLocation();
 
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -191,9 +193,17 @@ export default function TodayEatScreen() {
     setError(null);
 
     try {
-      const url = `${API_BASE_URL}/api/v1/restaurants/today?query=${encodeURIComponent(
-        'quán ăn',
-      )}&limit=20`;
+      const params = new URLSearchParams({
+        query: 'quán ăn',
+        limit: '20',
+      });
+
+      if (coordinates) {
+        params.set('lat', String(coordinates.lat));
+        params.set('lng', String(coordinates.lng));
+      }
+
+      const url = `${API_BASE_URL}/api/v1/restaurants/today?${params.toString()}`;
       const response = await fetch(url);
 
       if (!response.ok) {
@@ -209,7 +219,7 @@ export default function TodayEatScreen() {
     } finally {
       revealResult();
     }
-  }, [revealResult]);
+  }, [coordinates, revealResult]);
 
   useEffect(() => {
     if (!loading) return;
