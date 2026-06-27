@@ -333,7 +333,9 @@ export default function TodayEatScreen() {
                   </View>
                   <View style={styles.statBox}>
                     <ThemedText style={styles.statValue}>🍽️</ThemedText>
-                    <ThemedText style={styles.statLabel}>{restaurantType(restaurant?.type)}</ThemedText>
+                    <ThemedText style={styles.statLabel}>
+                      {restaurantType(restaurant?.type)}
+                    </ThemedText>
                   </View>
                 </View>
 
@@ -384,7 +386,11 @@ export default function TodayEatScreen() {
                       }}
                     >
                       {images.map((img, i) => (
-                        <Image key={`${img}-${i}`} source={{ uri: img }} style={styles.galleryImage} />
+                        <Image
+                          key={`${img}-${i}`}
+                          source={{ uri: img }}
+                          style={styles.galleryImage}
+                        />
                       ))}
                     </ScrollView>
                     <View style={styles.dotRow}>
@@ -401,7 +407,7 @@ export default function TodayEatScreen() {
                   </View>
                 ) : null}
 
-                {restaurant?.opening_hours?.length ? (
+                {/* {restaurant?.opening_hours?.length ? (
                   <View style={styles.sectionBlock}>
                     <ThemedText style={styles.sectionTitle}>Giờ mở cửa</ThemedText>
                     {restaurant.opening_hours.slice(0, 7).map((hour) => (
@@ -411,7 +417,7 @@ export default function TodayEatScreen() {
                       </View>
                     ))}
                   </View>
-                ) : null}
+                ) : null} */}
 
                 {visibleReviews.length > 0 ? (
                   <View style={styles.sectionBlock}>
@@ -442,7 +448,10 @@ export default function TodayEatScreen() {
               <ThemedText style={styles.mapBtnText}>Mở bản đồ</ThemedText>
             </Pressable>
 
-            <Pressable style={[styles.actionBtn, styles.nextBtn]} onPress={() => setShowReason(true)}>
+            <Pressable
+              style={[styles.actionBtn, styles.nextBtn]}
+              onPress={() => setShowReason(true)}
+            >
               <ThemedText style={styles.nextBtnText}>Đổi quán</ThemedText>
             </Pressable>
           </View>
