@@ -17,9 +17,9 @@ type Client struct {
 
 func NewClient(ctx context.Context, cfg config.RedisConfig) (*Client, error) {
 	client := redis.NewClient(&redis.Options{
-		Addr:     cfg.Addr,
-		Password: cfg.Password,
-		DB:       cfg.DB,
+		Addr: cfg.Addr,
+		// Password: cfg.Password,
+		DB: cfg.DB,
 	})
 
 	redisClient := &Client{client: client}
