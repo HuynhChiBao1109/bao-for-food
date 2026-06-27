@@ -4,6 +4,7 @@ import "encoding/json"
 
 type NearbyRestaurantsQuery struct {
 	IP     string
+	UserID string
 	Query  string
 	Limit  int
 	Lat    float64
@@ -42,4 +43,10 @@ type PickRestaurantResponse struct {
 	Source       string          `json:"source"`
 	DetailSource string          `json:"detail_source"`
 	Restaurant   json.RawMessage `json:"restaurant"`
+}
+
+type UserRestaurantItem struct {
+	DataID     string          `json:"data_id"`
+	Detail     json.RawMessage `json:"detail"`
+	RecordedAt string          `json:"recorded_at"`
 }

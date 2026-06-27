@@ -76,6 +76,11 @@ func main() {
 		log.Fatalf("ensure restaurant indexes: %v", err)
 	}
 
+	userRestaurantRepo := repository.NewMongoUserRestaurantRepository(mongoClient.Collection("user_saved_restaurants"))
+	if err := userRestaurantRepo.EnsureIndexes(initCtx); err != nil {
+		log.Fatalf("ensure user restaurant indexes: %v", err)
+	}
+
 	hub := realtime.NewHub(cfg.WebSocket.AllowedOrigins)
 	go hub.Run(appCtx)
 
@@ -88,7 +93,7 @@ func main() {
 
 	authService := service.NewAuthService(authRepo, redisClient)
 	userService := service.NewUserService(userRepo, redisClient, cfg.Cache.UserTTL, cfg.WebSocket.RedisChannel)
-	restaurantService := service.NewRestaurantService(redisClient, pisoClient, restaurantRepo, cfg.Cache.LocationTTL)
+	restaurantService := service.NewRestaurantService(redisClient, pisoClient, restaurantRepo, userRestaurantRepo, cfg.Cache.LocationTTL)
 	healthService := service.NewHealthService(map[string]interfaces.Pinger{
 		"mongodb": mongoClient,
 		"redis":   redisClient,
@@ -97,7 +102,7 @@ func main() {
 	authHandler := handler.NewAuthHandler(authService)
 	healthHandler := handler.NewHealthHandler(healthService)
 	userHandler := handler.NewUserHandler(userService)
-	restaurantHandler := handler.NewRestaurantHandler(restaurantService)
+	restaurantHandler := handler.NewRestaurantHandler(restaurantService, authService)
 	webSocketHandler := handler.NewWebSocketHandler(hub)
 
 	engine := router.New(cfg, router.Dependencies{

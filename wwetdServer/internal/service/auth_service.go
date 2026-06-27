@@ -115,6 +115,18 @@ func (s *authService) VerifyOTP(ctx context.Context, request dto.VerifyOTPReques
 	return s.issueAuth(ctx, user)
 }
 
+func (s *authService) UserIDFromToken(ctx context.Context, token string) (string, error) {
+	if s.cache == nil || strings.TrimSpace(token) == "" {
+		return "", domain.ErrInvalidCredentials
+	}
+
+	userID, err := s.cache.Get(ctx, authSessionKey(strings.TrimSpace(token)))
+	if err != nil {
+		return "", domain.ErrInvalidCredentials
+	}
+	return userID, nil
+}
+
 func (s *authService) issueAuth(ctx context.Context, user *domain.AuthUser) (dto.AuthResponse, error) {
 	token, err := randomBase64(32)
 	if err != nil {

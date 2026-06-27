@@ -11,4 +11,5 @@ type AuthService interface {
 	Login(ctx context.Context, request dto.LoginRequest) (dto.AuthResponse, error)
 	RequestOTP(ctx context.Context, request dto.RequestOTPRequest) (dto.OTPResponse, error)
 	VerifyOTP(ctx context.Context, request dto.VerifyOTPRequest) (dto.AuthResponse, error)
+	UserIDFromToken(ctx context.Context, token string) (string, error)
 }

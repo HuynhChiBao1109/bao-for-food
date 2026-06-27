@@ -14,8 +14,9 @@ func TestRestaurantServiceSearchNearbyGeneratesCachesAndCallsPiso(t *testing.T) 
 	ctx := context.Background()
 	cacheStore := newFakeCache()
 	restaurantRepo := newFakeRestaurantRepo()
+	userRestaurantRepo := newFakeUserRestaurantRepo()
 	piso := &fakePisoSearcher{searchResponse: json.RawMessage(`{"local_result":[]}`)}
-	svc := NewRestaurantService(cacheStore, piso, restaurantRepo, time.Hour)
+	svc := NewRestaurantService(cacheStore, piso, restaurantRepo, userRestaurantRepo, time.Hour)
 
 	result, err := svc.SearchNearby(ctx, dto.NearbyRestaurantsQuery{
 		IP:    "8.8.8.8",
@@ -47,6 +48,7 @@ func TestRestaurantServiceSearchNearbyUsesCachedLocation(t *testing.T) {
 	ctx := context.Background()
 	cacheStore := newFakeCache()
 	restaurantRepo := newFakeRestaurantRepo()
+	userRestaurantRepo := newFakeUserRestaurantRepo()
 	cachedLocation := dto.ClientLocation{IP: "8.8.4.4", Lat: 10.8, Lng: 106.7}
 	payload, err := json.Marshal(cachedLocation)
 	if err != nil {
@@ -55,7 +57,7 @@ func TestRestaurantServiceSearchNearbyUsesCachedLocation(t *testing.T) {
 	cacheStore.values[locationCacheKey("8.8.4.4")] = string(payload)
 
 	piso := &fakePisoSearcher{searchResponse: json.RawMessage(`{"local_result":[]}`)}
-	svc := NewRestaurantService(cacheStore, piso, restaurantRepo, time.Hour)
+	svc := NewRestaurantService(cacheStore, piso, restaurantRepo, userRestaurantRepo, time.Hour)
 
 	result, err := svc.SearchNearby(ctx, dto.NearbyRestaurantsQuery{IP: "8.8.4.4"})
 	if err != nil {
@@ -77,6 +79,7 @@ func TestRestaurantServicePickNearbyReturnsOneRestaurant(t *testing.T) {
 	ctx := context.Background()
 	cacheStore := newFakeCache()
 	restaurantRepo := newFakeRestaurantRepo()
+	userRestaurantRepo := newFakeUserRestaurantRepo()
 	piso := &fakePisoSearcher{
 		searchResponse: json.RawMessage(`{
 		"local_result": [
@@ -86,7 +89,7 @@ func TestRestaurantServicePickNearbyReturnsOneRestaurant(t *testing.T) {
 	}`),
 		placeResponse: json.RawMessage(`{"data_id": "place-a", "title": "Quán A detail"}`),
 	}
-	svc := NewRestaurantService(cacheStore, piso, restaurantRepo, time.Hour)
+	svc := NewRestaurantService(cacheStore, piso, restaurantRepo, userRestaurantRepo, time.Hour)
 
 	result, err := svc.PickNearby(ctx, dto.NearbyRestaurantsQuery{IP: "8.8.8.8"})
 	if err != nil {
@@ -115,6 +118,7 @@ func TestRestaurantServicePickNearbyUsesSavedRestaurantDetail(t *testing.T) {
 	ctx := context.Background()
 	cacheStore := newFakeCache()
 	restaurantRepo := newFakeRestaurantRepo()
+	userRestaurantRepo := newFakeUserRestaurantRepo()
 	restaurantRepo.details["place-a"] = json.RawMessage(`{"data_id": "place-a", "title": "Saved detail"}`)
 
 	piso := &fakePisoSearcher{
@@ -125,7 +129,7 @@ func TestRestaurantServicePickNearbyUsesSavedRestaurantDetail(t *testing.T) {
 	}`),
 		placeResponse: json.RawMessage(`{"data_id": "place-a", "title": "Piso detail"}`),
 	}
-	svc := NewRestaurantService(cacheStore, piso, restaurantRepo, time.Hour)
+	svc := NewRestaurantService(cacheStore, piso, restaurantRepo, userRestaurantRepo, time.Hour)
 
 	result, err := svc.PickNearby(ctx, dto.NearbyRestaurantsQuery{IP: "8.8.8.8"})
 	if err != nil {
@@ -187,4 +191,27 @@ func (r *fakeRestaurantRepo) FindDetailByDataID(_ context.Context, dataID string
 func (r *fakeRestaurantRepo) UpsertDetail(_ context.Context, detail *domain.RestaurantDetail) error {
 	r.details[detail.DataID] = detail.Detail
 	return nil
+}
+
+type fakeUserRestaurantRepo struct {
+	saved []domain.UserRestaurant
+}
+
+func newFakeUserRestaurantRepo() *fakeUserRestaurantRepo {
+	return &fakeUserRestaurantRepo{}
+}
+
+func (r *fakeUserRestaurantRepo) UpsertSaved(_ context.Context, item *domain.UserRestaurant) error {
+	r.saved = append(r.saved, *item)
+	return nil
+}
+
+func (r *fakeUserRestaurantRepo) ListSaved(_ context.Context, userID string) ([]domain.UserRestaurant, error) {
+	var items []domain.UserRestaurant
+	for _, item := range r.saved {
+		if item.UserID == userID {
+			items = append(items, item)
+		}
+	}
+	return items, nil
 }

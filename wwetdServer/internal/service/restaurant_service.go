@@ -22,21 +22,24 @@ import (
 
 const (
 	defaultRestaurantQuery = "quán ăn gần đây"
+	viewedRestaurantsTTL   = 24 * time.Hour
 )
 
 type restaurantService struct {
-	cache       cache.Store
-	piso        interfaces.PisoSearcher
-	restaurants repository.RestaurantRepository
-	locationTTL time.Duration
+	cache           cache.Store
+	piso            interfaces.PisoSearcher
+	restaurants     repository.RestaurantRepository
+	userRestaurants repository.UserRestaurantRepository
+	locationTTL     time.Duration
 }
 
-func NewRestaurantService(cacheStore cache.Store, pisoSearcher interfaces.PisoSearcher, restaurantRepo repository.RestaurantRepository, locationTTL time.Duration) interfaces.RestaurantService {
+func NewRestaurantService(cacheStore cache.Store, pisoSearcher interfaces.PisoSearcher, restaurantRepo repository.RestaurantRepository, userRestaurantRepo repository.UserRestaurantRepository, locationTTL time.Duration) interfaces.RestaurantService {
 	return &restaurantService{
-		cache:       cacheStore,
-		piso:        pisoSearcher,
-		restaurants: restaurantRepo,
-		locationTTL: locationTTL,
+		cache:           cacheStore,
+		piso:            pisoSearcher,
+		restaurants:     restaurantRepo,
+		userRestaurants: userRestaurantRepo,
+		locationTTL:     locationTTL,
 	}
 }
 
@@ -83,6 +86,11 @@ func (s *restaurantService) PickNearby(ctx context.Context, query dto.NearbyRest
 		return dto.PickRestaurantResponse{}, domain.ErrRestaurantNotFound
 	}
 
+	restaurants = s.filterViewedRestaurants(ctx, query.UserID, restaurants)
+	if len(restaurants) == 0 {
+		return dto.PickRestaurantResponse{}, domain.ErrRestaurantNotFound
+	}
+
 	index, err := randomIndex(len(restaurants))
 	if err != nil {
 		return dto.PickRestaurantResponse{}, err
@@ -105,6 +113,63 @@ func (s *restaurantService) PickNearby(ctx context.Context, query dto.NearbyRest
 		DetailSource: detailSource,
 		Restaurant:   detail,
 	}, nil
+}
+
+func (s *restaurantService) RecordViewed(ctx context.Context, userID string, dataID string, location dto.ClientLocation) error {
+	detail, _, err := s.getPlaceDetail(ctx, dataID, location)
+	if err != nil {
+		return err
+	}
+
+	items, _ := s.getViewedItems(ctx, userID)
+	now := time.Now().UTC()
+	next := make([]domain.UserRestaurant, 0, len(items)+1)
+	next = append(next, domain.UserRestaurant{
+		UserID:     userID,
+		DataID:     dataID,
+		Detail:     detail,
+		RecordedAt: now,
+	})
+	for _, item := range items {
+		if item.DataID != dataID {
+			next = append(next, item)
+		}
+	}
+
+	payload, err := json.Marshal(next)
+	if err != nil {
+		return err
+	}
+	return s.cache.Set(ctx, viewedRestaurantsKey(userID), string(payload), viewedRestaurantsTTL)
+}
+
+func (s *restaurantService) ListViewed(ctx context.Context, userID string) ([]dto.UserRestaurantItem, error) {
+	items, err := s.getViewedItems(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	return toUserRestaurantItems(items), nil
+}
+
+func (s *restaurantService) SaveRestaurant(ctx context.Context, userID string, dataID string, location dto.ClientLocation) error {
+	detail, _, err := s.getPlaceDetail(ctx, dataID, location)
+	if err != nil {
+		return err
+	}
+
+	return s.userRestaurants.UpsertSaved(ctx, &domain.UserRestaurant{
+		UserID: userID,
+		DataID: dataID,
+		Detail: detail,
+	})
+}
+
+func (s *restaurantService) ListSaved(ctx context.Context, userID string) ([]dto.UserRestaurantItem, error) {
+	items, err := s.userRestaurants.ListSaved(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	return toUserRestaurantItems(items), nil
 }
 
 func (s *restaurantService) resolveLocation(ctx context.Context, query dto.NearbyRestaurantsQuery) (dto.ClientLocation, string) {
@@ -158,6 +223,10 @@ func (s *restaurantService) cacheLocation(ctx context.Context, location dto.Clie
 
 func locationCacheKey(ip string) string {
 	return fmt.Sprintf("locations:ip:%s", ip)
+}
+
+func viewedRestaurantsKey(userID string) string {
+	return fmt.Sprintf("users:%s:restaurants:viewed", userID)
 }
 
 func normalizeIP(value string) string {
@@ -291,6 +360,64 @@ func normalizePlaceDetail(payload json.RawMessage) json.RawMessage {
 	}
 
 	return payload
+}
+
+func (s *restaurantService) filterViewedRestaurants(ctx context.Context, userID string, restaurants []json.RawMessage) []json.RawMessage {
+	if strings.TrimSpace(userID) == "" {
+		return restaurants
+	}
+
+	viewedItems, err := s.getViewedItems(ctx, userID)
+	if err != nil || len(viewedItems) == 0 {
+		return restaurants
+	}
+
+	viewed := make(map[string]struct{}, len(viewedItems))
+	for _, item := range viewedItems {
+		viewed[item.DataID] = struct{}{}
+	}
+
+	filtered := make([]json.RawMessage, 0, len(restaurants))
+	for _, restaurant := range restaurants {
+		dataID, err := extractDataID(restaurant)
+		if err != nil {
+			continue
+		}
+		if _, ok := viewed[dataID]; !ok {
+			filtered = append(filtered, restaurant)
+		}
+	}
+
+	return filtered
+}
+
+func (s *restaurantService) getViewedItems(ctx context.Context, userID string) ([]domain.UserRestaurant, error) {
+	if s.cache == nil || strings.TrimSpace(userID) == "" {
+		return []domain.UserRestaurant{}, nil
+	}
+
+	payload, err := s.cache.Get(ctx, viewedRestaurantsKey(userID))
+	if err != nil {
+		return []domain.UserRestaurant{}, nil
+	}
+
+	var items []domain.UserRestaurant
+	if err := json.Unmarshal([]byte(payload), &items); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+func toUserRestaurantItems(items []domain.UserRestaurant) []dto.UserRestaurantItem {
+	response := make([]dto.UserRestaurantItem, 0, len(items))
+	for _, item := range items {
+		response = append(response, dto.UserRestaurantItem{
+			DataID:     item.DataID,
+			Detail:     item.Detail,
+			RecordedAt: item.RecordedAt.Format(time.RFC3339),
+		})
+	}
+	return response
 }
 
 func randomIndex(length int) (int, error) {

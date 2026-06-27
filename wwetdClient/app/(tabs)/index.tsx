@@ -102,14 +102,41 @@ export default function HomeScreen() {
         </Pressable>
       </Link>
 
-      <Link href="/rate-food" asChild>
-        <Pressable style={styles.card}>
+      {user ? (
+        <Link href="/viewed-restaurants" asChild>
+          <Pressable style={styles.card}>
+            <ThemedText type="title" style={styles.cardTitle}>
+              🍽️ Quán ăn bạn đã xem
+            </ThemedText>
+            <ThemedText style={styles.cardDesc}>Danh sách các quán đã mở hôm nay</ThemedText>
+          </Pressable>
+        </Link>
+      ) : (
+        <Pressable style={[styles.card, styles.disabledCard]}>
           <ThemedText type="title" style={styles.cardTitle}>
-            🍽️ Địa chỉ bạn đã xem hôm nay
+            🍽️ Quán ăn bạn đã xem
           </ThemedText>
-          <ThemedText style={styles.cardDesc}>Địa chỉ bạn đã xem hôm nay</ThemedText>
+          <ThemedText style={styles.cardDesc}>Đăng nhập để xem mục này</ThemedText>
         </Pressable>
-      </Link>
+      )}
+
+      {user ? (
+        <Link href="/saved-restaurants" asChild>
+          <Pressable style={styles.card}>
+            <ThemedText type="title" style={styles.cardTitle}>
+              💾 Quán ăn đã lưu
+            </ThemedText>
+            <ThemedText style={styles.cardDesc}>Những quán bạn muốn quay lại</ThemedText>
+          </Pressable>
+        </Link>
+      ) : (
+        <Pressable style={[styles.card, styles.disabledCard]}>
+          <ThemedText type="title" style={styles.cardTitle}>
+            💾 Quán ăn đã lưu
+          </ThemedText>
+          <ThemedText style={styles.cardDesc}>Đăng nhập để lưu quán</ThemedText>
+        </Pressable>
+      )}
 
       <Modal transparent visible={showLocationPopup} animationType="fade">
         <View style={styles.overlay}>
@@ -266,6 +293,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 4 },
+  },
+  disabledCard: {
+    opacity: 0.45,
   },
   cardTitle: {
     color: '#fff',

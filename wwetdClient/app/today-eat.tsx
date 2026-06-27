@@ -2,6 +2,7 @@ import { API_BASE_URL } from '@/constants/api';
 import { Fonts } from '@/constants/theme';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { useAuth } from '@/contexts/auth-context';
 import { useCurrentLocation } from '@/contexts/location-context';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -166,6 +167,7 @@ export default function TodayEatScreen() {
   const [error, setError] = useState<string | null>(null);
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
   const { coordinates } = useCurrentLocation();
+  const { token, user } = useAuth();
 
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -204,7 +206,9 @@ export default function TodayEatScreen() {
       }
 
       const url = `${API_BASE_URL}/api/v1/restaurants/today?${params.toString()}`;
-      const response = await fetch(url);
+      const response = await fetch(url, {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      });
 
       if (!response.ok) {
         throw new Error('Không chọn được quán lúc này');
@@ -219,7 +223,42 @@ export default function TodayEatScreen() {
     } finally {
       revealResult();
     }
-  }, [coordinates, revealResult]);
+  }, [coordinates, revealResult, token]);
+
+  const restaurantActionURL = useCallback(
+    (action: 'viewed' | 'saved') => {
+      if (!restaurant?.data_id) return null;
+
+      const params = new URLSearchParams();
+      if (coordinates) {
+        params.set('lat', String(coordinates.lat));
+        params.set('lng', String(coordinates.lng));
+      }
+
+      const query = params.toString();
+      return `${API_BASE_URL}/api/v1/restaurants/${encodeURIComponent(restaurant.data_id)}/${action}${
+        query ? `?${query}` : ''
+      }`;
+    },
+    [coordinates, restaurant?.data_id],
+  );
+
+  const postRestaurantAction = useCallback(
+    async (action: 'viewed' | 'saved') => {
+      if (!token || !restaurant?.data_id) return;
+
+      const url = restaurantActionURL(action);
+      if (!url) return;
+
+      await fetch(url, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+    },
+    [restaurant?.data_id, restaurantActionURL, token],
+  );
 
   useEffect(() => {
     if (!loading) return;
@@ -451,11 +490,20 @@ export default function TodayEatScreen() {
               style={[styles.actionBtn, styles.mapBtn]}
               onPress={() => {
                 if (restaurant?.link_google_maps) {
+                  postRestaurantAction('viewed');
                   Linking.openURL(restaurant.link_google_maps);
                 }
               }}
             >
               <ThemedText style={styles.mapBtnText}>Mở bản đồ</ThemedText>
+            </Pressable>
+
+            <Pressable
+              disabled={!user}
+              style={[styles.actionBtn, user ? styles.saveBtn : styles.disabledActionBtn]}
+              onPress={() => postRestaurantAction('saved')}
+            >
+              <ThemedText style={styles.saveBtnText}>Lưu quán</ThemedText>
             </Pressable>
 
             <Pressable
@@ -795,6 +843,21 @@ const styles = StyleSheet.create({
 
   nextBtn: {
     backgroundColor: ACCENT,
+  },
+
+  saveBtn: {
+    backgroundColor: '#f4d35e',
+  },
+
+  disabledActionBtn: {
+    backgroundColor: '#d6dfc5',
+    opacity: 0.55,
+  },
+
+  saveBtnText: {
+    color: INK,
+    fontFamily: Fonts.rounded,
+    fontWeight: '900',
   },
 
   nextBtnText: {

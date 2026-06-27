@@ -48,6 +48,10 @@ func New(cfg config.Config, deps Dependencies) *gin.Engine {
 		{
 			restaurants.GET("/nearby", deps.Restaurants.SearchNearby)
 			restaurants.GET("/today", deps.Restaurants.PickNearby)
+			restaurants.GET("/viewed", deps.Restaurants.ListViewed)
+			restaurants.POST("/:data_id/viewed", deps.Restaurants.RecordViewed)
+			restaurants.GET("/saved", deps.Restaurants.ListSaved)
+			restaurants.POST("/:data_id/saved", deps.Restaurants.Save)
 		}
 
 		api.GET("/ws", deps.WebSocket.Handle)
