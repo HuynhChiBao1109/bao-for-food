@@ -36,6 +36,7 @@ export default function HomeScreen() {
   const [debugOtp, setDebugOtp] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const avatarLabel = user?.phone?.slice(-2) || 'BA';
 
   useEffect(() => {
     async function checkLoginPrompt() {
@@ -97,8 +98,36 @@ export default function HomeScreen() {
     }
   };
 
+  const openLoginForm = () => {
+    setAuthError(null);
+    setDebugOtp(null);
+    setAuthMode('login');
+    setShowLoginPopup(true);
+  };
+
   return (
     <ThemedView style={styles.container}>
+      <View style={styles.header}>
+        <View style={styles.brand}>
+          <Image source={require('@/assets/images/icon.png')} style={styles.headerIcon} />
+          <View>
+            <ThemedText style={styles.brandName}>BAO</ThemedText>
+            <ThemedText style={styles.brandSub}>Hôm nay ăn gì?</ThemedText>
+          </View>
+        </View>
+
+        {user ? (
+          <View style={styles.avatar}>
+            <ThemedText style={styles.avatarText}>{avatarLabel}</ThemedText>
+          </View>
+        ) : (
+          <Pressable style={styles.loginBtn} onPress={openLoginForm}>
+            <ThemedText style={styles.loginBtnText}>Đăng nhập</ThemedText>
+          </Pressable>
+        )}
+      </View>
+
+      <View style={styles.content}>
       <Link href="/today-eat" asChild>
         <Pressable style={styles.card}>
           <ThemedText type="title" style={styles.cardTitle}>
@@ -142,6 +171,7 @@ export default function HomeScreen() {
           <ThemedText style={styles.cardDesc}>Đăng nhập để lưu quán</ThemedText>
         </Pressable>
       )}
+      </View>
 
       <Modal transparent visible={showLocationPopup} animationType="fade">
         <View style={styles.overlay}>
@@ -297,9 +327,69 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: '#f7fbec',
     padding: 20,
+  },
+  header: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingTop: 42,
+    width: '100%',
+  },
+  brand: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 12,
+  },
+  headerIcon: {
+    borderRadius: 16,
+    height: 52,
+    width: 52,
+  },
+  brandName: {
+    color: '#21320f',
+    fontSize: 22,
+    fontWeight: '900',
+  },
+  brandSub: {
+    color: '#667653',
+    fontSize: 13,
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  loginBtn: {
+    alignItems: 'center',
+    backgroundColor: '#e67e45',
+    borderRadius: 18,
+    minWidth: 104,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+  },
+  loginBtnText: {
+    color: '#fffdf5',
+    fontWeight: '900',
+  },
+  avatar: {
+    alignItems: 'center',
+    backgroundColor: '#496a24',
+    borderColor: '#dbeabf',
+    borderRadius: 24,
+    borderWidth: 3,
+    height: 48,
+    justifyContent: 'center',
+    width: 48,
+  },
+  avatarText: {
+    color: '#fffdf5',
+    fontSize: 15,
+    fontWeight: '900',
+  },
+  content: {
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
+    width: '100%',
   },
   card: {
     width: '100%',
