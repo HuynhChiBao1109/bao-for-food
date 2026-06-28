@@ -1,0 +1,33 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "server: hot reload",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}/wwetdServer/scripts/dev.ps1"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}/wwetdServer"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "server: install air",
+      "type": "shell",
+      "command": "go",
+      "args": [
+        "install",
+        "github.com/air-verse/air@latest"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}/wwetdServer"
+      },
+      "problemMatcher": []
+    }
+  ]
+}

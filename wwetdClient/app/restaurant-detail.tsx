@@ -6,7 +6,15 @@ import { useAuth } from '@/contexts/auth-context';
 import { useCurrentLocation } from '@/contexts/location-context';
 import { useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Image, Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Image,
+  Linking,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+} from 'react-native';
 
 const BACKGROUND = '#6f8f46';
 const SURFACE = '#fbfff3';
@@ -170,7 +178,10 @@ export default function RestaurantDetailScreen() {
         </View>
       ) : (
         <>
-          <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+          >
             <View style={styles.hero}>
               <Image source={{ uri: images[0] }} style={styles.heroImage} />
               <View style={styles.heroShade} />
@@ -193,7 +204,9 @@ export default function RestaurantDetailScreen() {
                   <ThemedText style={styles.statLabel}>Điểm</ThemedText>
                 </View>
                 <View style={styles.statBox}>
-                  <ThemedText style={styles.statValue}>{reviewCount(restaurant ?? undefined)}</ThemedText>
+                  <ThemedText style={styles.statValue}>
+                    {reviewCount(restaurant ?? undefined)}
+                  </ThemedText>
                   <ThemedText style={styles.statLabel}>Đánh giá</ThemedText>
                 </View>
               </View>
@@ -210,7 +223,11 @@ export default function RestaurantDetailScreen() {
                   <ThemedText style={styles.sectionTitle}>Hình ảnh</ThemedText>
                   <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                     {images.map((image, index) => (
-                      <Image key={`${image}-${index}`} source={{ uri: image }} style={styles.galleryImage} />
+                      <Image
+                        key={`${image}-${index}`}
+                        source={{ uri: image }}
+                        style={styles.galleryImage}
+                      />
                     ))}
                   </ScrollView>
                 </View>
@@ -224,7 +241,11 @@ export default function RestaurantDetailScreen() {
             </Pressable>
             <Pressable
               disabled={!user || isSaved || saveState === 'loading'}
-              style={[styles.actionBtn, user ? styles.saveBtn : styles.disabledBtn, isSaved ? styles.savedBtn : null]}
+              style={[
+                styles.actionBtn,
+                user ? styles.saveBtn : styles.disabledBtn,
+                isSaved ? styles.savedBtn : null,
+              ]}
               onPress={saveRestaurant}
             >
               {saveState === 'loading' ? (

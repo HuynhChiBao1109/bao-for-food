@@ -48,7 +48,9 @@ export default function ViewedRestaurantsScreen() {
       <ScrollView contentContainerStyle={styles.list}>
         {items.map((item) => (
           <View key={`${item.data_id}-${item.recorded_at}`} style={styles.card}>
-            {firstPhoto(item) ? <Image source={{ uri: firstPhoto(item) }} style={styles.image} /> : null}
+            {firstPhoto(item) ? (
+              <Image source={{ uri: firstPhoto(item) }} style={styles.image} />
+            ) : null}
             <View style={styles.cardBody}>
               <ThemedText style={styles.name}>{item.detail.title ?? 'Quán ăn'}</ThemedText>
               <ThemedText style={styles.meta}>

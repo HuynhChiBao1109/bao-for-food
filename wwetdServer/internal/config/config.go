@@ -23,7 +23,8 @@ type Config struct {
 }
 
 type AppConfig struct {
-	Env string
+	Env   string
+	Debug bool
 }
 
 type ServerConfig struct {
@@ -94,9 +95,16 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 
+	appEnv := getEnv("APP_ENV", "development")
+	debug, err := getEnvAsBool("DEBUG", appEnv != "production")
+	if err != nil {
+		return Config{}, err
+	}
+
 	cfg := Config{
 		App: AppConfig{
-			Env: getEnv("APP_ENV", "development"),
+			Env:   appEnv,
+			Debug: debug,
 		},
 		Server: ServerConfig{
 			Host: getEnv("SERVER_HOST", "0.0.0.0"),
@@ -149,6 +157,19 @@ func getEnvAsInt(key string, fallback int) (int, error) {
 	parsed, err := strconv.Atoi(value)
 	if err != nil {
 		return 0, fmt.Errorf("parse %s as int: %w", key, err)
+	}
+	return parsed, nil
+}
+
+func getEnvAsBool(key string, fallback bool) (bool, error) {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return fallback, nil
+	}
+
+	parsed, err := strconv.ParseBool(value)
+	if err != nil {
+		return false, fmt.Errorf("parse %s as bool: %w", key, err)
 	}
 	return parsed, nil
 }

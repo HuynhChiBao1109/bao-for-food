@@ -25,6 +25,21 @@ docker compose up -d
 go run ./cmd/server
 ```
 
+## Debug and hot reload
+
+VS Code:
+
+- Use `Debug Server` to run the Go server with the debugger.
+- Run task `server: hot reload` to start the server with Air. When you save a `.go` or `.env` file, Air rebuilds and restarts the server like nodemon.
+- If Air is missing, run task `server: install air` once.
+
+Terminal:
+
+```powershell
+go install github.com/air-verse/air@latest
+.\scripts\dev.ps1
+```
+
 Useful endpoints:
 
 ```text

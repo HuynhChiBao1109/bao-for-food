@@ -29,7 +29,9 @@ func main() {
 		log.Fatalf("load config: %v", err)
 	}
 
-	if cfg.App.Env == "production" {
+	if cfg.App.Debug {
+		gin.SetMode(gin.DebugMode)
+	} else if cfg.App.Env == "production" {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
