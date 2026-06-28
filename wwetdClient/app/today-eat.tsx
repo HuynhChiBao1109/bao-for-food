@@ -24,7 +24,7 @@ const MUTED = '#667653';
 const ACCENT = '#e67e45';
 const PRIMARY = '#496a24';
 
-const ALL_ICONS = ['🍜', '🍕', '🥗', '🍔', '🍣', '🥪', '🍰', '🍛', '🍗', '🍩'];
+const ALL_ICONS = ['🤔', '✨', '😋', '🍽️', '💭', '🥢', '🎲', '🌟', '🤤', '👀'];
 
 const FALLBACK_IMAGES = [
   'https://images.unsplash.com/photo-1551218808-94e220e084d2',
@@ -345,7 +345,7 @@ export default function TodayEatScreen() {
             })}
           </View>
 
-          <ThemedText style={styles.loadingText}>Đang chọn quán phù hợp{dots}</ThemedText>
+          <ThemedText style={styles.loadingText}>BAO đang suy nghĩ{dots}</ThemedText>
         </View>
       ) : (
         <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
