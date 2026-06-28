@@ -1,7 +1,7 @@
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
-const BACKEND_PORT = 8080;
+const BACKEND_PORT = 8081;
 
 function expoHost() {
   const hostUri = Constants.expoConfig?.hostUri;
