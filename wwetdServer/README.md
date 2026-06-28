@@ -55,7 +55,7 @@ GET  /api/v1/ws
 Example create user:
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/users \
+curl -X POST http://localhost:8090/api/v1/users \
   -H "Content-Type: application/json" \
   -d '{"name":"Ada Lovelace","email":"ada@example.com"}'
 ```
