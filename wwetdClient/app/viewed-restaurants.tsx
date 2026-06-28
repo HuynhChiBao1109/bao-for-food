@@ -24,17 +24,15 @@ function firstPhoto(item: RestaurantItem) {
 }
 
 export default function ViewedRestaurantsScreen() {
-  const { token } = useAuth();
+  const { authFetch, user } = useAuth();
   const [items, setItems] = useState<RestaurantItem[]>([]);
 
   const load = useCallback(async () => {
-    if (!token) return;
-    const response = await fetch(`${API_BASE_URL}/api/v1/restaurants/viewed`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    if (!user) return;
+    const response = await authFetch(`${API_BASE_URL}/api/v1/restaurants/viewed`);
     const payload = (await response.json()) as ListResponse;
     setItems(payload.data ?? []);
-  }, [token]);
+  }, [authFetch, user]);
 
   useEffect(() => {
     load();

@@ -54,3 +54,20 @@ func (r *MongoAuthRepository) FindByPhone(ctx context.Context, phone string) (*d
 	}
 	return &user, nil
 }
+
+func (r *MongoAuthRepository) FindByID(ctx context.Context, id string) (*domain.AuthUser, error) {
+	objectID, err := bson.ObjectIDFromHex(id)
+	if err != nil {
+		return nil, domain.ErrAuthUserNotFound
+	}
+
+	var user domain.AuthUser
+	err = r.collection.FindOne(ctx, bson.M{"_id": objectID}).Decode(&user)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return nil, domain.ErrAuthUserNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
+}

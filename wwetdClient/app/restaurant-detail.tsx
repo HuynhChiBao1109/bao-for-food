@@ -64,7 +64,7 @@ function reviewCount(restaurant?: RestaurantDetail) {
 export default function RestaurantDetailScreen() {
   const params = useLocalSearchParams<{ data_id?: string }>();
   const dataID = Array.isArray(params.data_id) ? params.data_id[0] : params.data_id;
-  const { token, user } = useAuth();
+  const { authFetch, user } = useAuth();
   const { coordinates } = useCurrentLocation();
   const [restaurant, setRestaurant] = useState<RestaurantDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -103,16 +103,15 @@ export default function RestaurantDetailScreen() {
 
   const recordAction = useCallback(
     async (action: 'saved' | 'viewed') => {
-      if (!token) return false;
+      if (!user) return false;
       const url = actionURL(action);
       if (!url) return false;
-      const response = await fetch(url, {
+      const response = await authFetch(url, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
       });
       return response.ok;
     },
-    [actionURL, token],
+    [actionURL, authFetch, user],
   );
 
   useEffect(() => {
@@ -122,9 +121,7 @@ export default function RestaurantDetailScreen() {
       setLoading(true);
       setError(null);
       try {
-        const response = await fetch(detailURL, {
-          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-        });
+        const response = await authFetch(detailURL);
         if (!response.ok) {
           throw new Error('Không tải được chi tiết quán');
         }
@@ -140,7 +137,7 @@ export default function RestaurantDetailScreen() {
     }
 
     load();
-  }, [detailURL, token]);
+  }, [authFetch, detailURL]);
 
   const saveRestaurant = useCallback(async () => {
     if (!user || isSaved || saveState === 'loading') return;

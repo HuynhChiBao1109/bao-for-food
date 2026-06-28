@@ -25,7 +25,8 @@ const (
 	passwordIterations = 120_000
 	passwordKeyLength  = 32
 	otpTTL             = 5 * time.Minute
-	authSessionTTL     = 24 * time.Hour
+	accessTokenTTL     = 24 * time.Hour
+	refreshTokenTTL    = 7 * 24 * time.Hour
 )
 
 var nonDigitPattern = regexp.MustCompile(`\D+`)
@@ -115,12 +116,32 @@ func (s *authService) VerifyOTP(ctx context.Context, request dto.VerifyOTPReques
 	return s.issueAuth(ctx, user)
 }
 
+func (s *authService) Refresh(ctx context.Context, request dto.RefreshTokenRequest) (dto.AuthResponse, error) {
+	refreshToken := strings.TrimSpace(request.RefreshToken)
+	if s.cache == nil || refreshToken == "" {
+		return dto.AuthResponse{}, domain.ErrInvalidCredentials
+	}
+
+	userID, err := s.cache.Get(ctx, refreshTokenKey(refreshToken))
+	if err != nil {
+		return dto.AuthResponse{}, domain.ErrInvalidCredentials
+	}
+
+	user, err := s.repo.FindByID(ctx, userID)
+	if err != nil {
+		return dto.AuthResponse{}, domain.ErrInvalidCredentials
+	}
+
+	_ = s.cache.Delete(ctx, refreshTokenKey(refreshToken))
+	return s.issueAuth(ctx, user)
+}
+
 func (s *authService) UserIDFromToken(ctx context.Context, token string) (string, error) {
 	if s.cache == nil || strings.TrimSpace(token) == "" {
 		return "", domain.ErrInvalidCredentials
 	}
 
-	userID, err := s.cache.Get(ctx, authSessionKey(strings.TrimSpace(token)))
+	userID, err := s.cache.Get(ctx, accessTokenKey(strings.TrimSpace(token)))
 	if err != nil {
 		return "", domain.ErrInvalidCredentials
 	}
@@ -128,20 +149,32 @@ func (s *authService) UserIDFromToken(ctx context.Context, token string) (string
 }
 
 func (s *authService) issueAuth(ctx context.Context, user *domain.AuthUser) (dto.AuthResponse, error) {
-	token, err := randomBase64(32)
+	accessToken, err := randomBase64(32)
+	if err != nil {
+		return dto.AuthResponse{}, err
+	}
+
+	refreshToken, err := randomBase64(32)
 	if err != nil {
 		return dto.AuthResponse{}, err
 	}
 
 	if s.cache != nil {
-		if err := s.cache.Set(ctx, authSessionKey(token), user.ID.Hex(), authSessionTTL); err != nil {
+		if err := s.cache.Set(ctx, accessTokenKey(accessToken), user.ID.Hex(), accessTokenTTL); err != nil {
+			return dto.AuthResponse{}, err
+		}
+		if err := s.cache.Set(ctx, refreshTokenKey(refreshToken), user.ID.Hex(), refreshTokenTTL); err != nil {
 			return dto.AuthResponse{}, err
 		}
 	}
 
 	return dto.AuthResponse{
-		Token: token,
-		User:  dto.NewAuthUserResponse(user),
+		Token:            accessToken,
+		AccessToken:      accessToken,
+		RefreshToken:     refreshToken,
+		ExpiresIn:        int(accessTokenTTL.Seconds()),
+		RefreshExpiresIn: int(refreshTokenTTL.Seconds()),
+		User:             dto.NewAuthUserResponse(user),
 	}, nil
 }
 
@@ -174,6 +207,10 @@ func otpCacheKey(phone string) string {
 	return fmt.Sprintf("auth:otp:%s", phone)
 }
 
-func authSessionKey(token string) string {
-	return fmt.Sprintf("auth:sessions:%s", token)
+func accessTokenKey(token string) string {
+	return fmt.Sprintf("auth:access:%s", token)
+}
+
+func refreshTokenKey(token string) string {
+	return fmt.Sprintf("auth:refresh:%s", token)
 }

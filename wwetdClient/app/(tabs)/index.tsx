@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Modal, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { Image, Modal, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { Link } from 'expo-router';
 
 import { ThemedText } from '@/components/themed-text';
@@ -104,7 +104,6 @@ export default function HomeScreen() {
           <ThemedText type="title" style={styles.cardTitle}>
             👀 Hôm nay ăn gì
           </ThemedText>
-          <ThemedText style={styles.cardDesc}>Anh ơi bữa nay ăn gì</ThemedText>
         </Pressable>
       </Link>
 
@@ -191,12 +190,7 @@ export default function HomeScreen() {
           <View style={styles.popup}>
             {authMode === 'intro' ? (
               <>
-                <ThemedText type="title" style={styles.popupTitle}>
-                  Đăng nhập để trải nghiệm tốt hơn
-                </ThemedText>
-                <ThemedText style={styles.popupDesc}>
-                  Lưu lịch sử quán đã xem, gợi ý hợp gu hơn và dùng OTP khi cần đăng nhập nhanh.
-                </ThemedText>
+                <Image source={require('@/assets/images/icon.png')} style={styles.appIcon} />
 
                 <Pressable style={styles.allowBtn} onPress={() => setAuthMode('login')}>
                   <ThemedText style={styles.allowText}>Đăng nhập</ThemedText>
@@ -266,7 +260,11 @@ export default function HomeScreen() {
                 </Pressable>
 
                 {authMode === 'login' ? (
-                  <Pressable style={styles.secondaryBtn} onPress={submitRequestOTP} disabled={authLoading}>
+                  <Pressable
+                    style={styles.secondaryBtn}
+                    onPress={submitRequestOTP}
+                    disabled={authLoading}
+                  >
                     <ThemedText style={styles.skipText}>Đăng nhập bằng OTP</ThemedText>
                   </Pressable>
                 ) : null}
@@ -345,6 +343,13 @@ const styles = StyleSheet.create({
   popupTitle: {
     color: '#21320f',
     marginBottom: 8,
+  },
+  appIcon: {
+    alignSelf: 'center',
+    borderRadius: 18,
+    height: 72,
+    marginBottom: 18,
+    width: 72,
   },
   popupDesc: {
     color: '#667653',

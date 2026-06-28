@@ -83,6 +83,22 @@ func (h *AuthHandler) VerifyOTP(c *gin.Context) {
 	respondOK(c, response)
 }
 
+func (h *AuthHandler) Refresh(c *gin.Context) {
+	var request dto.RefreshTokenRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		respondError(c, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	response, err := h.service.Refresh(c.Request.Context(), request)
+	if err != nil {
+		handleAuthError(c, err)
+		return
+	}
+
+	respondOK(c, response)
+}
+
 func handleAuthError(c *gin.Context, err error) {
 	switch {
 	case errors.Is(err, domain.ErrPhoneAlreadyExists):

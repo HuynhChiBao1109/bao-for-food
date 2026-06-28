@@ -169,7 +169,7 @@ export default function TodayEatScreen() {
   const [isSaved, setIsSaved] = useState(false);
   const [saveState, setSaveState] = useState<'idle' | 'loading' | 'success'>('idle');
   const { coordinates } = useCurrentLocation();
-  const { token, user } = useAuth();
+  const { authFetch, user } = useAuth();
 
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -208,9 +208,7 @@ export default function TodayEatScreen() {
       }
 
       const url = `${API_BASE_URL}/api/v1/restaurants/today?${params.toString()}`;
-      const response = await fetch(url, {
-        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-      });
+      const response = await authFetch(url);
 
       if (!response.ok) {
         throw new Error('Không chọn được quán lúc này');
@@ -227,7 +225,7 @@ export default function TodayEatScreen() {
     } finally {
       revealResult();
     }
-  }, [coordinates, revealResult, token]);
+  }, [authFetch, coordinates, revealResult]);
 
   const restaurantActionURL = useCallback(
     (action: 'viewed' | 'saved') => {
@@ -249,20 +247,17 @@ export default function TodayEatScreen() {
 
   const postRestaurantAction = useCallback(
     async (action: 'viewed' | 'saved') => {
-      if (!token || !restaurant?.data_id) return false;
+      if (!user || !restaurant?.data_id) return false;
 
       const url = restaurantActionURL(action);
       if (!url) return false;
 
-      const response = await fetch(url, {
+      const response = await authFetch(url, {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
       });
       return response.ok;
     },
-    [restaurant?.data_id, restaurantActionURL, token],
+    [authFetch, restaurant?.data_id, restaurantActionURL, user],
   );
 
   const saveRestaurant = useCallback(async () => {

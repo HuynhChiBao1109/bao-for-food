@@ -25,6 +25,10 @@ type VerifyOTPRequest struct {
 	OTP   string `json:"otp" binding:"required,len=6"`
 }
 
+type RefreshTokenRequest struct {
+	RefreshToken string `json:"refresh_token" binding:"required"`
+}
+
 type AuthUserResponse struct {
 	ID        string    `json:"id"`
 	Phone     string    `json:"phone"`
@@ -32,8 +36,12 @@ type AuthUserResponse struct {
 }
 
 type AuthResponse struct {
-	Token string           `json:"token"`
-	User  AuthUserResponse `json:"user"`
+	Token            string           `json:"token"`
+	AccessToken      string           `json:"access_token"`
+	RefreshToken     string           `json:"refresh_token"`
+	ExpiresIn        int              `json:"expires_in"`
+	RefreshExpiresIn int              `json:"refresh_expires_in"`
+	User             AuthUserResponse `json:"user"`
 }
 
 type OTPResponse struct {

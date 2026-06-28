@@ -33,6 +33,7 @@ func New(cfg config.Config, deps Dependencies) *gin.Engine {
 		{
 			auth.POST("/register", deps.Auth.Register)
 			auth.POST("/login", deps.Auth.Login)
+			auth.POST("/refresh", deps.Auth.Refresh)
 			auth.POST("/otp/request", deps.Auth.RequestOTP)
 			auth.POST("/otp/verify", deps.Auth.VerifyOTP)
 		}
