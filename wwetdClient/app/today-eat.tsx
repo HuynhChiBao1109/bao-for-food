@@ -197,17 +197,15 @@ export default function TodayEatScreen() {
     setError(null);
 
     try {
-      const params = new URLSearchParams({
-        query: 'quán ăn',
-        limit: '20',
-      });
+      const params = new URLSearchParams();
 
       if (coordinates) {
         params.set('lat', String(coordinates.lat));
         params.set('lng', String(coordinates.lng));
       }
 
-      const url = `${API_BASE_URL}/api/v1/restaurants/today?${params.toString()}`;
+      const query = params.toString();
+      const url = `${API_BASE_URL}/api/v1/restaurants/today${query ? `?${query}` : ''}`;
       const response = await authFetch(url);
 
       if (!response.ok) {

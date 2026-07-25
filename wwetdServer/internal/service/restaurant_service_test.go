@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"math"
 	"testing"
 	"time"
 
@@ -151,15 +152,98 @@ func TestRestaurantServicePickNearbyUsesSavedRestaurantDetail(t *testing.T) {
 	}
 }
 
+func TestRestaurantServicePickNearbyExpandsSearchWhenNearestRestaurantsWereViewed(t *testing.T) {
+	ctx := context.Background()
+	cacheStore := newFakeCache()
+	restaurantRepo := newFakeRestaurantRepo()
+	userRestaurantRepo := newFakeUserRestaurantRepo()
+	userID := "user-a"
+
+	viewedItems := make([]domain.UserRestaurant, 0, todayRestaurantLimit)
+	for index := 1; index <= todayRestaurantLimit; index++ {
+		viewedItems = append(viewedItems, domain.UserRestaurant{
+			UserID: userID,
+			DataID: "viewed-" + string(rune('a'+index-1)),
+		})
+	}
+	viewedPayload, err := json.Marshal(viewedItems)
+	if err != nil {
+		t.Fatalf("marshal viewed restaurants: %v", err)
+	}
+	cacheStore.values[viewedRestaurantsKey(userID)] = string(viewedPayload)
+
+	piso := &fakePisoSearcher{
+		searchResponses: []json.RawMessage{
+			json.RawMessage(`{
+				"local_result": [
+					{"data_id": "viewed-a"}, {"data_id": "viewed-b"},
+					{"data_id": "viewed-c"}, {"data_id": "viewed-d"},
+					{"data_id": "viewed-e"}, {"data_id": "viewed-f"},
+					{"data_id": "viewed-g"}, {"data_id": "viewed-h"},
+					{"data_id": "viewed-i"}, {"data_id": "viewed-j"}
+				]
+			}`),
+			json.RawMessage(`{"local_result":[{"data_id":"place-new","title":"Quán mới"}]}`),
+		},
+		placeResponse: json.RawMessage(`{"data_id":"place-new","title":"Quán mới detail"}`),
+	}
+	svc := NewRestaurantService(cacheStore, piso, restaurantRepo, userRestaurantRepo, time.Hour)
+
+	result, err := svc.PickNearby(ctx, dto.NearbyRestaurantsQuery{
+		UserID: userID,
+		Lat:    10.7,
+		Lng:    106.7,
+		HasLat: true,
+		HasLng: true,
+	})
+	if err != nil {
+		t.Fatalf("PickNearby returned error: %v", err)
+	}
+
+	if len(piso.searchCalls) != 2 {
+		t.Fatalf("expected two piso search calls, got %d", len(piso.searchCalls))
+	}
+	if piso.searchCalls[0].Limit != todayRestaurantLimit {
+		t.Fatalf("expected today limit %d, got %d", todayRestaurantLimit, piso.searchCalls[0].Limit)
+	}
+	if piso.searchCalls[0].Query != defaultRestaurantQuery {
+		t.Fatalf("expected default restaurant query, got %q", piso.searchCalls[0].Query)
+	}
+	if math.Abs(piso.searchCalls[1].Lat-10.71) > 0.000001 ||
+		math.Abs(piso.searchCalls[1].Lng-106.71) > 0.000001 {
+		t.Fatalf(
+			"expected expanded coordinates lat=10.71 lng=106.71, got lat=%f lng=%f",
+			piso.searchCalls[1].Lat,
+			piso.searchCalls[1].Lng,
+		)
+	}
+	if result.Location.Lat != 10.7 || result.Location.Lng != 106.7 {
+		t.Fatalf("expected original response location, got lat=%f lng=%f", result.Location.Lat, result.Location.Lng)
+	}
+
+	var restaurant map[string]interface{}
+	if err := json.Unmarshal(result.Restaurant, &restaurant); err != nil {
+		t.Fatalf("unmarshal selected restaurant: %v", err)
+	}
+	if restaurant["data_id"] != "place-new" {
+		t.Fatalf("expected unviewed restaurant place-new, got %v", restaurant["data_id"])
+	}
+}
+
 type fakePisoSearcher struct {
-	searchResponse json.RawMessage
-	placeResponse  json.RawMessage
-	searchCalls    []dto.PisoSearchParams
-	placeCalls     []dto.PisoPlaceParams
+	searchResponse  json.RawMessage
+	searchResponses []json.RawMessage
+	placeResponse   json.RawMessage
+	searchCalls     []dto.PisoSearchParams
+	placeCalls      []dto.PisoPlaceParams
 }
 
 func (s *fakePisoSearcher) Search(_ context.Context, params dto.PisoSearchParams) (json.RawMessage, error) {
 	s.searchCalls = append(s.searchCalls, params)
+	index := len(s.searchCalls) - 1
+	if index < len(s.searchResponses) {
+		return s.searchResponses[index], nil
+	}
 	return s.searchResponse, nil
 }
 

@@ -1,0 +1,30 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "backend: hot reload",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}/scripts/dev.ps1"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "backend: test",
+      "type": "shell",
+      "command": "go",
+      "args": ["test", "./..."],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": "$go"
+    }
+  ]
+}

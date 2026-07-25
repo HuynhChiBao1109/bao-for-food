@@ -48,7 +48,7 @@ POST /api/v1/users
 GET  /api/v1/users/:id
 GET  /api/v1/users?page=1&limit=20
 GET  /api/v1/restaurants/nearby?query=quán%20ăn&limit=20
-GET  /api/v1/restaurants/today?query=quán%20ăn&limit=20
+GET  /api/v1/restaurants/today?lat=10.776889&lng=106.700806
 GET  /api/v1/ws
 ```
 

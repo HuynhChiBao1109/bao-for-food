@@ -23,6 +23,9 @@ import (
 const (
 	defaultRestaurantQuery = "quán ăn gần đây"
 	viewedRestaurantsTTL   = 24 * time.Hour
+	todayRestaurantLimit   = 10
+	todaySearchMaxAttempts = 10
+	todaySearchStep        = 0.01
 )
 
 type restaurantService struct {
@@ -69,24 +72,36 @@ func (s *restaurantService) SearchNearby(ctx context.Context, query dto.NearbyRe
 }
 
 func (s *restaurantService) PickNearby(ctx context.Context, query dto.NearbyRestaurantsQuery) (dto.PickRestaurantResponse, error) {
-	if query.Limit <= 0 {
-		query.Limit = 20
+	location, source := s.resolveLocation(ctx, query)
+	searchLocation := location
+	viewed := s.viewedRestaurantIDs(ctx, query.UserID)
+	var restaurants []json.RawMessage
+
+	for attempt := 0; attempt < todaySearchMaxAttempts; attempt++ {
+		results, err := s.piso.Search(ctx, dto.PisoSearchParams{
+			Query: defaultRestaurantQuery,
+			Lat:   searchLocation.Lat,
+			Lng:   searchLocation.Lng,
+			Limit: todayRestaurantLimit,
+		})
+		if err != nil {
+			return dto.PickRestaurantResponse{}, err
+		}
+
+		restaurants, err = extractRestaurants(results)
+		if err != nil && !errors.Is(err, domain.ErrRestaurantNotFound) {
+			return dto.PickRestaurantResponse{}, err
+		}
+
+		restaurants = filterRestaurantsByID(restaurants, viewed)
+		if len(restaurants) > 0 {
+			break
+		}
+
+		searchLocation.Lat += todaySearchStep
+		searchLocation.Lng += todaySearchStep
 	}
 
-	nearby, err := s.SearchNearby(ctx, query)
-	if err != nil {
-		return dto.PickRestaurantResponse{}, err
-	}
-
-	restaurants, err := extractRestaurants(nearby.Results)
-	if err != nil {
-		return dto.PickRestaurantResponse{}, err
-	}
-	if len(restaurants) == 0 {
-		return dto.PickRestaurantResponse{}, domain.ErrRestaurantNotFound
-	}
-
-	restaurants = s.filterViewedRestaurants(ctx, query.UserID, restaurants)
 	if len(restaurants) == 0 {
 		return dto.PickRestaurantResponse{}, domain.ErrRestaurantNotFound
 	}
@@ -102,14 +117,14 @@ func (s *restaurantService) PickNearby(ctx context.Context, query dto.NearbyRest
 		return dto.PickRestaurantResponse{}, err
 	}
 
-	detail, detailSource, err := s.getPlaceDetail(ctx, dataID, nearby.Location)
+	detail, detailSource, err := s.getPlaceDetail(ctx, dataID, searchLocation)
 	if err != nil {
 		return dto.PickRestaurantResponse{}, err
 	}
 
 	return dto.PickRestaurantResponse{
-		Location:     nearby.Location,
-		Source:       nearby.Source,
+		Location:     location,
+		Source:       source,
 		DetailSource: detailSource,
 		Restaurant:   detail,
 		IsSaved:      s.isSaved(ctx, query.UserID, dataID),
@@ -376,19 +391,26 @@ func normalizePlaceDetail(payload json.RawMessage) json.RawMessage {
 	return payload
 }
 
-func (s *restaurantService) filterViewedRestaurants(ctx context.Context, userID string, restaurants []json.RawMessage) []json.RawMessage {
+func (s *restaurantService) viewedRestaurantIDs(ctx context.Context, userID string) map[string]struct{} {
 	if strings.TrimSpace(userID) == "" {
-		return restaurants
+		return nil
 	}
 
 	viewedItems, err := s.getViewedItems(ctx, userID)
 	if err != nil || len(viewedItems) == 0 {
-		return restaurants
+		return nil
 	}
 
 	viewed := make(map[string]struct{}, len(viewedItems))
 	for _, item := range viewedItems {
 		viewed[item.DataID] = struct{}{}
+	}
+	return viewed
+}
+
+func filterRestaurantsByID(restaurants []json.RawMessage, excluded map[string]struct{}) []json.RawMessage {
+	if len(excluded) == 0 {
+		return restaurants
 	}
 
 	filtered := make([]json.RawMessage, 0, len(restaurants))
@@ -397,7 +419,7 @@ func (s *restaurantService) filterViewedRestaurants(ctx context.Context, userID 
 		if err != nil {
 			continue
 		}
-		if _, ok := viewed[dataID]; !ok {
+		if _, ok := excluded[dataID]; !ok {
 			filtered = append(filtered, restaurant)
 		}
 	}
