@@ -44,6 +44,9 @@ Useful endpoints:
 
 ```text
 GET  /api/v1/health
+GET  /api/v1/auth/me
+PATCH /api/v1/auth/profile
+POST /api/v1/auth/avatar
 POST /api/v1/users
 GET  /api/v1/users/:id
 GET  /api/v1/users?page=1&limit=20

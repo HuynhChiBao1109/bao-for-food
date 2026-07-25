@@ -24,6 +24,7 @@ func New(cfg config.Config, deps Dependencies) *gin.Engine {
 	engine.GET("/", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"service": "wwetd-server", "status": "ok"})
 	})
+	engine.StaticFS("/uploads", gin.Dir(cfg.Server.UploadDir, false))
 
 	api := engine.Group("/api/v1")
 	{
@@ -36,6 +37,9 @@ func New(cfg config.Config, deps Dependencies) *gin.Engine {
 			auth.POST("/refresh", deps.Auth.Refresh)
 			auth.POST("/otp/request", deps.Auth.RequestOTP)
 			auth.POST("/otp/verify", deps.Auth.VerifyOTP)
+			auth.GET("/me", deps.Auth.GetMe)
+			auth.PATCH("/profile", deps.Auth.UpdateName)
+			auth.POST("/avatar", deps.Auth.UploadAvatar)
 		}
 
 		users := api.Group("/users")

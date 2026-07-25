@@ -101,7 +101,7 @@ func main() {
 		"redis":   redisClient,
 	})
 
-	authHandler := handler.NewAuthHandler(authService)
+	authHandler := handler.NewAuthHandler(authService, cfg.Server.UploadDir)
 	healthHandler := handler.NewHealthHandler(healthService)
 	userHandler := handler.NewUserHandler(userService)
 	restaurantHandler := handler.NewRestaurantHandler(restaurantService, authService)

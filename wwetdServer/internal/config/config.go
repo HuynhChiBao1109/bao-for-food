@@ -28,8 +28,9 @@ type AppConfig struct {
 }
 
 type ServerConfig struct {
-	Host string
-	Port int
+	Host      string
+	Port      int
+	UploadDir string
 }
 
 func (c ServerConfig) Address() string {
@@ -107,8 +108,9 @@ func Load() (Config, error) {
 			Debug: debug,
 		},
 		Server: ServerConfig{
-			Host: getEnv("SERVER_HOST", "0.0.0.0"),
-			Port: serverPort,
+			Host:      getEnv("SERVER_HOST", "0.0.0.0"),
+			Port:      serverPort,
+			UploadDir: getEnv("UPLOAD_DIR", "uploads"),
 		},
 		CORS: CORSConfig{
 			AllowedOrigins: getEnvAsCSV("CORS_ALLOWED_ORIGINS", []string{"*"}),

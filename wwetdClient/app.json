@@ -48,6 +48,12 @@
             "backgroundColor": "#000000"
           }
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "BAO cần truy cập thư viện ảnh để bạn chọn ảnh đại diện."
+        }
       ]
     ],
     "experiments": {

@@ -9,10 +9,10 @@ import {
   useRef,
   useState,
 } from 'react';
-import { Image, Modal, Pressable, StyleSheet, TextInput, View } from 'react-native';
 
+import { AuthFormModal } from '@/components/auth-form-modal';
+import { NameFormModal } from '@/components/name-form-modal';
 import { API_BASE_URL } from '@/constants/api';
-import { ThemedText } from '@/components/themed-text';
 
 const AUTH_TOKEN_KEY = 'wwetd.auth.token';
 const AUTH_REFRESH_TOKEN_KEY = 'wwetd.auth.refresh_token';
@@ -20,10 +20,20 @@ const AUTH_USER_KEY = 'wwetd.auth.user';
 const LOGIN_SKIP_UNTIL_KEY = 'wwetd.auth.skip_until';
 const SKIP_DURATION_MS = 24 * 60 * 60 * 1000;
 
-type AuthUser = {
+export type AuthUser = {
   id: string;
+  name: string;
+  avatar: string;
   phone: string;
   created_at: string;
+  updated_at: string;
+};
+
+export type AvatarUpload = {
+  uri: string;
+  fileName?: string | null;
+  mimeType?: string | null;
+  file?: Blob | null;
 };
 
 type AuthResponse = {
@@ -59,6 +69,9 @@ type AuthContextValue = {
   login: (phone: string, password: string) => Promise<void>;
   requestOTP: (phone: string) => Promise<OTPResponse['data']>;
   verifyOTP: (phone: string, otp: string) => Promise<void>;
+  updateName: (name: string) => Promise<void>;
+  refreshUser: () => Promise<void>;
+  uploadAvatar: (avatar: AvatarUpload) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -69,10 +82,6 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const [refreshToken, setRefreshToken] = useState<string | null>(null);
   const [booting, setBooting] = useState(true);
   const [showLoginForm, setShowLoginForm] = useState(false);
-  const [loginPhone, setLoginPhone] = useState('');
-  const [loginPassword, setLoginPassword] = useState('');
-  const [loginLoading, setLoginLoading] = useState(false);
-  const [loginError, setLoginError] = useState<string | null>(null);
   const refreshPromiseRef = useRef<Promise<string | null> | null>(null);
 
   useEffect(() => {
@@ -113,7 +122,6 @@ export function AuthProvider({ children }: PropsWithChildren) {
         : AsyncStorage.removeItem(AUTH_REFRESH_TOKEN_KEY),
     ]);
     setShowLoginForm(false);
-    setLoginError(null);
   }, []);
 
   const clearAuth = useCallback(async () => {
@@ -263,6 +271,73 @@ export function AuthProvider({ children }: PropsWithChildren) {
     [persistAuth, post],
   );
 
+  const updateName = useCallback(
+    async (name: string) => {
+      const response = await authFetch('/api/v1/auth/profile', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ name }),
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload?.error?.message ?? 'Không lưu được tên');
+      }
+
+      const nextUser = payload.data as AuthUser;
+      setUser(nextUser);
+      await AsyncStorage.setItem(AUTH_USER_KEY, JSON.stringify(nextUser));
+    },
+    [authFetch],
+  );
+
+  const persistUser = useCallback(async (nextUser: AuthUser) => {
+    setUser(nextUser);
+    await AsyncStorage.setItem(AUTH_USER_KEY, JSON.stringify(nextUser));
+  }, []);
+
+  const refreshUser = useCallback(async () => {
+    const response = await authFetch('/api/v1/auth/me');
+    const payload = await response.json();
+    if (!response.ok) {
+      throw new Error(payload?.error?.message ?? 'Không tải được thông tin cá nhân');
+    }
+    await persistUser(payload.data as AuthUser);
+  }, [authFetch, persistUser]);
+
+  const uploadAvatar = useCallback(
+    async (avatar: AvatarUpload) => {
+      const form = new FormData();
+      const fileName = avatar.fileName ?? `avatar-${Date.now()}.jpg`;
+      const mimeType = avatar.mimeType ?? 'image/jpeg';
+
+      if (avatar.file) {
+        form.append('avatar', avatar.file, fileName);
+      } else {
+        form.append(
+          'avatar',
+          {
+            uri: avatar.uri,
+            name: fileName,
+            type: mimeType,
+          } as unknown as Blob,
+        );
+      }
+
+      const response = await authFetch('/api/v1/auth/avatar', {
+        method: 'POST',
+        body: form,
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload?.error?.message ?? 'Không tải được ảnh đại diện');
+      }
+      await persistUser(payload.data as AuthUser);
+    },
+    [authFetch, persistUser],
+  );
+
   const value = useMemo(
     () => ({
       user,
@@ -278,6 +353,9 @@ export function AuthProvider({ children }: PropsWithChildren) {
       login,
       requestOTP,
       verifyOTP,
+      updateName,
+      refreshUser,
+      uploadAvatar,
     }),
     [
       authFetch,
@@ -285,6 +363,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       clearAuth,
       login,
       refreshToken,
+      refreshUser,
       register,
       requestOTP,
       requireLogin,
@@ -292,65 +371,27 @@ export function AuthProvider({ children }: PropsWithChildren) {
       skipLoginPrompt,
       token,
       user,
+      updateName,
+      uploadAvatar,
       verifyOTP,
     ],
   );
 
-  const submitModalLogin = useCallback(async () => {
-    setLoginLoading(true);
-    setLoginError(null);
-    try {
-      await login(loginPhone, loginPassword);
-    } catch (err) {
-      setLoginError(err instanceof Error ? err.message : 'Không đăng nhập được');
-    } finally {
-      setLoginLoading(false);
-    }
-  }, [login, loginPassword, loginPhone]);
-
   return (
     <AuthContext.Provider value={value}>
       {children}
-      <Modal transparent visible={showLoginForm} animationType="fade">
-        <View style={styles.overlay}>
-          <View style={styles.popup}>
-            <Pressable
-              accessibilityLabel="Đóng"
-              style={styles.closeBtn}
-              onPress={() => setShowLoginForm(false)}
-            >
-              <ThemedText style={styles.closeText}>×</ThemedText>
-            </Pressable>
-            <Image source={require('@/assets/images/icon.png')} style={styles.appIcon} />
-            <ThemedText style={styles.popupDesc}>Hãy đang nhập để BAO hiểu về bạn hơn</ThemedText>
-
-            <TextInput
-              keyboardType="phone-pad"
-              onChangeText={setLoginPhone}
-              placeholder="Số điện thoại"
-              placeholderTextColor="#8a9678"
-              style={styles.input}
-              value={loginPhone}
-            />
-            <TextInput
-              onChangeText={setLoginPassword}
-              placeholder="Mật khẩu"
-              placeholderTextColor="#8a9678"
-              secureTextEntry
-              style={styles.input}
-              value={loginPassword}
-            />
-
-            {loginError ? <ThemedText style={styles.errorText}>{loginError}</ThemedText> : null}
-
-            <Pressable style={styles.allowBtn} onPress={submitModalLogin} disabled={loginLoading}>
-              <ThemedText style={styles.allowText}>
-                {loginLoading ? 'Đang đăng nhập...' : 'Đăng nhập'}
-              </ThemedText>
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
+      <AuthFormModal
+        visible={showLoginForm}
+        onClose={() => setShowLoginForm(false)}
+        login={login}
+        register={register}
+        requestOTP={requestOTP}
+        verifyOTP={verifyOTP}
+      />
+      <NameFormModal
+        visible={Boolean(user && !user.name?.trim())}
+        updateName={updateName}
+      />
     </AuthContext.Provider>
   );
 }
@@ -362,76 +403,3 @@ export function useAuth() {
   }
   return value;
 }
-
-const styles = StyleSheet.create({
-  overlay: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(19,31,12,0.48)',
-    flex: 1,
-    justifyContent: 'center',
-    padding: 24,
-  },
-  popup: {
-    backgroundColor: '#fbfff3',
-    borderRadius: 22,
-    padding: 20,
-    position: 'relative',
-    width: '100%',
-  },
-  closeBtn: {
-    alignItems: 'center',
-    backgroundColor: '#eef6df',
-    borderRadius: 16,
-    height: 32,
-    justifyContent: 'center',
-    position: 'absolute',
-    right: 14,
-    top: 14,
-    width: 32,
-    zIndex: 1,
-  },
-  closeText: {
-    color: '#496a24',
-    fontSize: 22,
-    fontWeight: '900',
-    lineHeight: 24,
-  },
-  appIcon: {
-    alignSelf: 'center',
-    borderRadius: 18,
-    height: 72,
-    marginBottom: 14,
-    width: 72,
-  },
-  popupDesc: {
-    color: '#667653',
-    fontSize: 15,
-    lineHeight: 22,
-    marginBottom: 18,
-  },
-  input: {
-    backgroundColor: '#eef6df',
-    borderRadius: 14,
-    color: '#21320f',
-    fontSize: 16,
-    marginBottom: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 13,
-  },
-  allowBtn: {
-    alignItems: 'center',
-    backgroundColor: '#e67e45',
-    borderRadius: 16,
-    paddingVertical: 14,
-  },
-  allowText: {
-    color: '#fffdf5',
-    fontWeight: '800',
-  },
-  errorText: {
-    color: '#c2410c',
-    fontSize: 13,
-    fontWeight: '700',
-    marginBottom: 10,
-  },
-});

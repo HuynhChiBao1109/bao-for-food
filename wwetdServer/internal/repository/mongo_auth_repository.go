@@ -71,3 +71,31 @@ func (r *MongoAuthRepository) FindByID(ctx context.Context, id string) (*domain.
 	}
 	return &user, nil
 }
+
+func (r *MongoAuthRepository) UpdateName(ctx context.Context, id string, name string) error {
+	return r.updateProfileField(ctx, id, "name", name)
+}
+
+func (r *MongoAuthRepository) UpdateAvatar(ctx context.Context, id string, avatar string) error {
+	return r.updateProfileField(ctx, id, "avatar", avatar)
+}
+
+func (r *MongoAuthRepository) updateProfileField(ctx context.Context, id string, field string, value string) error {
+	objectID, err := bson.ObjectIDFromHex(id)
+	if err != nil {
+		return domain.ErrAuthUserNotFound
+	}
+
+	result, err := r.collection.UpdateOne(
+		ctx,
+		bson.M{"_id": objectID},
+		bson.M{"$set": bson.M{field: value, "updated_at": time.Now().UTC()}},
+	)
+	if err != nil {
+		return err
+	}
+	if result.MatchedCount == 0 {
+		return domain.ErrAuthUserNotFound
+	}
+	return nil
+}

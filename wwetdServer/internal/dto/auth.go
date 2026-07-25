@@ -29,10 +29,17 @@ type RefreshTokenRequest struct {
 	RefreshToken string `json:"refresh_token" binding:"required"`
 }
 
+type UpdateNameRequest struct {
+	Name string `json:"name" binding:"required,max=80"`
+}
+
 type AuthUserResponse struct {
 	ID        string    `json:"id"`
+	Name      string    `json:"name"`
+	Avatar    string    `json:"avatar"`
 	Phone     string    `json:"phone"`
 	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 type AuthResponse struct {
@@ -53,7 +60,10 @@ type OTPResponse struct {
 func NewAuthUserResponse(user *domain.AuthUser) AuthUserResponse {
 	return AuthUserResponse{
 		ID:        user.ID.Hex(),
+		Name:      user.Name,
+		Avatar:    user.Avatar,
 		Phone:     user.Phone,
 		CreatedAt: user.CreatedAt,
+		UpdatedAt: user.UpdatedAt,
 	}
 }

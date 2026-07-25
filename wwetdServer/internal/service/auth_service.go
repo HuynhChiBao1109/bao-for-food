@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"golang.org/x/crypto/pbkdf2"
 
@@ -29,7 +30,10 @@ const (
 	refreshTokenTTL    = 7 * 24 * time.Hour
 )
 
-var nonDigitPattern = regexp.MustCompile(`\D+`)
+var (
+	nonDigitPattern   = regexp.MustCompile(`\D+`)
+	phoneInputPattern = regexp.MustCompile(`^[0-9+().\s-]+$`)
+)
 
 type authService struct {
 	repo  repository.AuthRepository
@@ -41,7 +45,14 @@ func NewAuthService(repo repository.AuthRepository, cacheStore cache.Store) inte
 }
 
 func (s *authService) Register(ctx context.Context, request dto.RegisterRequest) (dto.AuthResponse, error) {
-	phone := normalizePhone(request.Phone)
+	phone, valid := validatePhone(request.Phone)
+	if !valid {
+		return dto.AuthResponse{}, domain.ErrInvalidPhone
+	}
+	if !validatePassword(request.Password) {
+		return dto.AuthResponse{}, domain.ErrInvalidPassword
+	}
+
 	salt, err := randomBase64(16)
 	if err != nil {
 		return dto.AuthResponse{}, err
@@ -60,8 +71,45 @@ func (s *authService) Register(ctx context.Context, request dto.RegisterRequest)
 	return s.issueAuth(ctx, user)
 }
 
+func (s *authService) UpdateName(ctx context.Context, userID string, request dto.UpdateNameRequest) (dto.AuthUserResponse, error) {
+	name := strings.TrimSpace(request.Name)
+	if name == "" {
+		return dto.AuthUserResponse{}, domain.ErrInvalidName
+	}
+
+	if err := s.repo.UpdateName(ctx, userID, name); err != nil {
+		return dto.AuthUserResponse{}, err
+	}
+
+	user, err := s.repo.FindByID(ctx, userID)
+	if err != nil {
+		return dto.AuthUserResponse{}, err
+	}
+	return dto.NewAuthUserResponse(user), nil
+}
+
+func (s *authService) GetMe(ctx context.Context, userID string) (dto.AuthUserResponse, error) {
+	user, err := s.repo.FindByID(ctx, userID)
+	if err != nil {
+		return dto.AuthUserResponse{}, err
+	}
+	return dto.NewAuthUserResponse(user), nil
+}
+
+func (s *authService) UpdateAvatar(ctx context.Context, userID string, avatar string) (dto.AuthUserResponse, error) {
+	if err := s.repo.UpdateAvatar(ctx, userID, avatar); err != nil {
+		return dto.AuthUserResponse{}, err
+	}
+
+	return s.GetMe(ctx, userID)
+}
+
 func (s *authService) Login(ctx context.Context, request dto.LoginRequest) (dto.AuthResponse, error) {
-	phone := normalizePhone(request.Phone)
+	phone, valid := validatePhone(request.Phone)
+	if !valid || !validatePassword(request.Password) {
+		return dto.AuthResponse{}, domain.ErrInvalidCredentials
+	}
+
 	user, err := s.repo.FindByPhone(ctx, phone)
 	if err != nil {
 		return dto.AuthResponse{}, domain.ErrInvalidCredentials
@@ -76,7 +124,11 @@ func (s *authService) Login(ctx context.Context, request dto.LoginRequest) (dto.
 }
 
 func (s *authService) RequestOTP(ctx context.Context, request dto.RequestOTPRequest) (dto.OTPResponse, error) {
-	phone := normalizePhone(request.Phone)
+	phone, valid := validatePhone(request.Phone)
+	if !valid {
+		return dto.OTPResponse{}, domain.ErrInvalidPhone
+	}
+
 	if _, err := s.repo.FindByPhone(ctx, phone); err != nil {
 		return dto.OTPResponse{}, domain.ErrAuthUserNotFound
 	}
@@ -98,7 +150,11 @@ func (s *authService) RequestOTP(ctx context.Context, request dto.RequestOTPRequ
 }
 
 func (s *authService) VerifyOTP(ctx context.Context, request dto.VerifyOTPRequest) (dto.AuthResponse, error) {
-	phone := normalizePhone(request.Phone)
+	phone, valid := validatePhone(request.Phone)
+	if !valid {
+		return dto.AuthResponse{}, domain.ErrInvalidOTP
+	}
+
 	cachedOTP, err := s.cache.Get(ctx, otpCacheKey(phone))
 	if err != nil {
 		return dto.AuthResponse{}, domain.ErrInvalidOTP
@@ -185,6 +241,21 @@ func hashPassword(password string, salt string) string {
 
 func normalizePhone(phone string) string {
 	return nonDigitPattern.ReplaceAllString(phone, "")
+}
+
+func validatePhone(phone string) (string, bool) {
+	value := strings.TrimSpace(phone)
+	if !phoneInputPattern.MatchString(value) {
+		return "", false
+	}
+
+	normalized := normalizePhone(value)
+	return normalized, len(normalized) >= 8 && len(normalized) <= 20
+}
+
+func validatePassword(password string) bool {
+	length := utf8.RuneCountInString(password)
+	return length >= 6 && length <= 72
 }
 
 func randomBase64(size int) (string, error) {

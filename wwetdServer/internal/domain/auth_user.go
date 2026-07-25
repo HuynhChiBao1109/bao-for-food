@@ -8,6 +8,8 @@ import (
 
 type AuthUser struct {
 	ID           bson.ObjectID `bson:"_id,omitempty" json:"id"`
+	Name         string        `bson:"name" json:"name"`
+	Avatar       string        `bson:"avatar" json:"avatar"`
 	Phone        string        `bson:"phone" json:"phone"`
 	PasswordHash string        `bson:"password_hash" json:"-"`
 	Salt         string        `bson:"salt" json:"-"`
