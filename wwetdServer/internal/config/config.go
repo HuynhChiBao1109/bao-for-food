@@ -98,7 +98,12 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 
-	pisoTimeout, err := getEnvAsDuration("PISO_TIMEOUT", 8*time.Second)
+	pisoTimeout, err := getEnvAsDuration("PISO_TIMEOUT", 10*time.Second)
+	if err != nil {
+		return Config{}, err
+	}
+
+	vinaTimeout, err := getEnvAsDuration("VINA_TIMEOUT", 10*time.Second)
 	if err != nil {
 		return Config{}, err
 	}
@@ -143,7 +148,7 @@ func Load() (Config, error) {
 		Vinamap: VinamapConfig{
 			APIKey:  getEnv("VINA_API_KEY", ""),
 			BaseURL: getEnv("VINA_BASE_URL", "https://maps.mapvina.com/api/v2/place/nearbysearch/json"),
-			Timeout: pisoTimeout,
+			Timeout: vinaTimeout,
 		},
 		WebSocket: WebSocketConfig{
 			AllowedOrigins: getEnvAsCSV("WS_ALLOWED_ORIGINS", []string{"*"}),
