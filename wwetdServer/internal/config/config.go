@@ -19,6 +19,7 @@ type Config struct {
 	Redis     RedisConfig
 	Cache     CacheConfig
 	Piso      PisoConfig
+	Vinamap   VinamapConfig
 	WebSocket WebSocketConfig
 }
 
@@ -59,6 +60,12 @@ type CacheConfig struct {
 
 type PisoConfig struct {
 	APIKey  string
+	BaseURL string
+	Timeout time.Duration
+}
+
+type VinamapConfig struct {
+	APIKey string
 	BaseURL string
 	Timeout time.Duration
 }
@@ -131,6 +138,11 @@ func Load() (Config, error) {
 		Piso: PisoConfig{
 			APIKey:  getEnv("PISO_API_KEY", ""),
 			BaseURL: getEnv("PISO_BASE_URL", "https://api.pisomap.tech"),
+			Timeout: pisoTimeout,
+		},
+		Vinamap: VinamapConfig{
+			APIKey:  getEnv("VINA_API_KEY", ""),
+			BaseURL: getEnv("VINA_BASE_URL", "https://maps.mapvina.com/api/v2/place/nearbysearch/json"),
 			Timeout: pisoTimeout,
 		},
 		WebSocket: WebSocketConfig{

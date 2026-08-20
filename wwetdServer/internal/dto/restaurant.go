@@ -32,6 +32,20 @@ type PisoPlaceParams struct {
 	Lng    float64
 }
 
+type VinamapSearchParams struct {
+	Query string
+	Lat   float64
+	Lng   float64
+	Limit int
+}
+
+type VinamapPlaceParams struct {
+	DataID string
+	Lat    float64
+	Lng    float64
+}
+
+
 type NearbyRestaurantsResponse struct {
 	Location ClientLocation  `json:"location"`
 	Source   string          `json:"source"`

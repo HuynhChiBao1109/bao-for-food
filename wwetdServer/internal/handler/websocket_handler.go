@@ -2,10 +2,9 @@ package handler
 
 import (
 	"net/http"
+	"wwetd-server/infrastructure/realtime"
 
 	"github.com/gin-gonic/gin"
-
-	"wwetd-server/internal/infrastructure/realtime"
 )
 
 type WebSocketHandler struct {
