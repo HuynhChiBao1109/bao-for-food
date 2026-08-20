@@ -13,6 +13,7 @@ import (
 
 	"wwetd-server/internal/config"
 	"wwetd-server/internal/dto"
+	"wwetd-server/internal/interfaces"
 )
 
 const (
@@ -26,12 +27,18 @@ type Client struct {
 	apiKey     string
 }
 
+var _ interfaces.NamedMapClient = (*Client)(nil)
+
 func NewClient(cfg config.PisoConfig) *Client {
 	return &Client{
 		httpClient: &http.Client{Timeout: cfg.Timeout},
 		baseURL:    strings.TrimRight(cfg.BaseURL, "/"),
 		apiKey:     cfg.APIKey,
 	}
+}
+
+func (c *Client) ProviderName() string {
+	return "piso"
 }
 
 func (c *Client) Search(ctx context.Context, params dto.PisoSearchParams) (json.RawMessage, error) {

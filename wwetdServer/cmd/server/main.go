@@ -11,16 +11,18 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"wwetd-server/infrastructure/mongodb"
+	"wwetd-server/infrastructure/realtime"
+	redisinfra "wwetd-server/infrastructure/redis"
+	"wwetd-server/integrations/piso"
+	vinamap "wwetd-server/integrations/vinaMap"
 	"wwetd-server/internal/config"
 	"wwetd-server/internal/handler"
-	"wwetd-server/internal/infrastructure/mongodb"
-	"wwetd-server/internal/infrastructure/realtime"
-	redisinfra "wwetd-server/internal/infrastructure/redis"
-	"wwetd-server/internal/integrations/piso"
 	"wwetd-server/internal/interfaces"
 	"wwetd-server/internal/repository"
 	"wwetd-server/internal/router"
 	"wwetd-server/internal/service"
+	mapstrategy "wwetd-server/internal/strategy"
 )
 
 func main() {
@@ -92,10 +94,15 @@ func main() {
 	}
 
 	pisoClient := piso.NewClient(cfg.Piso)
+	vinaMapClient := vinamap.NewClient(cfg.Vinamap)
+	mapClient, err := mapstrategy.NewMapClient(cfg.MapProvider, pisoClient, vinaMapClient)
+	if err != nil {
+		log.Fatalf("configure map provider: %v", err)
+	}
 
 	authService := service.NewAuthService(authRepo, redisClient)
 	userService := service.NewUserService(userRepo, redisClient, cfg.Cache.UserTTL, cfg.WebSocket.RedisChannel)
-	restaurantService := service.NewRestaurantService(redisClient, pisoClient, restaurantRepo, userRestaurantRepo, cfg.Cache.LocationTTL)
+	restaurantService := service.NewRestaurantService(redisClient, mapClient, restaurantRepo, userRestaurantRepo, cfg.Cache.LocationTTL)
 	healthService := service.NewHealthService(map[string]interfaces.Pinger{
 		"mongodb": mongoClient,
 		"redis":   redisClient,

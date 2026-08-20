@@ -30,16 +30,16 @@ const (
 
 type restaurantService struct {
 	cache           cache.Store
-	piso            interfaces.PisoSearcher
+	maps            interfaces.MapClient
 	restaurants     repository.RestaurantRepository
 	userRestaurants repository.UserRestaurantRepository
 	locationTTL     time.Duration
 }
 
-func NewRestaurantService(cacheStore cache.Store, pisoSearcher interfaces.PisoSearcher, restaurantRepo repository.RestaurantRepository, userRestaurantRepo repository.UserRestaurantRepository, locationTTL time.Duration) interfaces.RestaurantService {
+func NewRestaurantService(cacheStore cache.Store, mapClient interfaces.MapClient, restaurantRepo repository.RestaurantRepository, userRestaurantRepo repository.UserRestaurantRepository, locationTTL time.Duration) interfaces.RestaurantService {
 	return &restaurantService{
 		cache:           cacheStore,
-		piso:            pisoSearcher,
+		maps:            mapClient,
 		restaurants:     restaurantRepo,
 		userRestaurants: userRestaurantRepo,
 		locationTTL:     locationTTL,
@@ -54,7 +54,7 @@ func (s *restaurantService) SearchNearby(ctx context.Context, query dto.NearbyRe
 		searchQuery = defaultRestaurantQuery
 	}
 
-	results, err := s.piso.Search(ctx, dto.PisoSearchParams{
+	results, err := s.maps.Search(ctx, dto.MapSearchParams{
 		Query: searchQuery,
 		Lat:   location.Lat,
 		Lng:   location.Lng,
@@ -78,7 +78,7 @@ func (s *restaurantService) PickNearby(ctx context.Context, query dto.NearbyRest
 	var restaurants []json.RawMessage
 
 	for attempt := 0; attempt < todaySearchMaxAttempts; attempt++ {
-		results, err := s.piso.Search(ctx, dto.PisoSearchParams{
+		results, err := s.maps.Search(ctx, dto.MapSearchParams{
 			Query: defaultRestaurantQuery,
 			Lat:   searchLocation.Lat,
 			Lng:   searchLocation.Lng,
@@ -356,7 +356,7 @@ func (s *restaurantService) getPlaceDetail(ctx context.Context, dataID string, l
 		}
 	}
 
-	detail, err := s.piso.Place(ctx, dto.PisoPlaceParams{
+	detail, err := s.maps.Place(ctx, dto.MapPlaceParams{
 		DataID: dataID,
 		Lat:    location.Lat,
 		Lng:    location.Lng,
@@ -376,7 +376,16 @@ func (s *restaurantService) getPlaceDetail(ctx context.Context, dataID string, l
 		}
 	}
 
-	return detail, "piso", nil
+	return detail, mapProviderName(s.maps), nil
+}
+
+func mapProviderName(client interfaces.MapClient) string {
+	if named, ok := client.(interface{ ProviderName() string }); ok {
+		if name := strings.TrimSpace(named.ProviderName()); name != "" {
+			return name
+		}
+	}
+	return "piso"
 }
 
 func normalizePlaceDetail(payload json.RawMessage) json.RawMessage {

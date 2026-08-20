@@ -7,10 +7,17 @@ import (
 	"wwetd-server/internal/dto"
 )
 
-type PisoSearcher interface {
-	Search(ctx context.Context, params dto.PisoSearchParams) (json.RawMessage, error)
-	Place(ctx context.Context, params dto.PisoPlaceParams) (json.RawMessage, error)
+type MapClient interface {
+	Search(ctx context.Context, params dto.MapSearchParams) (json.RawMessage, error)
+	Place(ctx context.Context, params dto.MapPlaceParams) (json.RawMessage, error)
 }
+
+type NamedMapClient interface {
+	MapClient
+	ProviderName() string
+}
+
+type PisoSearcher = MapClient
 
 type RestaurantService interface {
 	SearchNearby(ctx context.Context, query dto.NearbyRestaurantsQuery) (dto.NearbyRestaurantsResponse, error)

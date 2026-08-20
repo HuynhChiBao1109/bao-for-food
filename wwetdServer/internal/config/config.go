@@ -12,15 +12,16 @@ import (
 )
 
 type Config struct {
-	App       AppConfig
-	Server    ServerConfig
-	CORS      CORSConfig
-	Mongo     MongoConfig
-	Redis     RedisConfig
-	Cache     CacheConfig
-	Piso      PisoConfig
-	Vinamap   VinamapConfig
-	WebSocket WebSocketConfig
+	App         AppConfig
+	Server      ServerConfig
+	CORS        CORSConfig
+	Mongo       MongoConfig
+	Redis       RedisConfig
+	Cache       CacheConfig
+	MapProvider string
+	Piso        PisoConfig
+	Vinamap     VinamapConfig
+	WebSocket   WebSocketConfig
 }
 
 type AppConfig struct {
@@ -65,9 +66,11 @@ type PisoConfig struct {
 }
 
 type VinamapConfig struct {
-	APIKey string
-	BaseURL string
-	Timeout time.Duration
+	APIKey    string
+	BaseURL   string
+	Timeout   time.Duration
+	Radius    int
+	PlaceType string
 }
 
 type WebSocketConfig struct {
@@ -108,6 +111,14 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 
+	vinaRadius, err := getEnvAsInt("VINA_RADIUS", 5000)
+	if err != nil {
+		return Config{}, err
+	}
+	if vinaRadius <= 0 {
+		return Config{}, fmt.Errorf("VINA_RADIUS must be greater than zero")
+	}
+
 	appEnv := getEnv("APP_ENV", "development")
 	debug, err := getEnvAsBool("DEBUG", appEnv != "production")
 	if err != nil {
@@ -140,15 +151,18 @@ func Load() (Config, error) {
 			UserTTL:     userTTL,
 			LocationTTL: locationTTL,
 		},
+		MapProvider: strings.ToLower(getEnv("MAP_PROVIDER", "piso")),
 		Piso: PisoConfig{
 			APIKey:  getEnv("PISO_API_KEY", ""),
 			BaseURL: getEnv("PISO_BASE_URL", "https://api.pisomap.tech"),
 			Timeout: pisoTimeout,
 		},
 		Vinamap: VinamapConfig{
-			APIKey:  getEnv("VINA_API_KEY", ""),
-			BaseURL: getEnv("VINA_BASE_URL", "https://maps.mapvina.com/api/v2/place/nearbysearch/json"),
-			Timeout: vinaTimeout,
+			APIKey:    getEnv("VINA_API_KEY", ""),
+			BaseURL:   getEnv("VINA_BASE_URL", "https://maps.mapvina.com"),
+			Timeout:   vinaTimeout,
+			Radius:    vinaRadius,
+			PlaceType: getEnv("VINA_PLACE_TYPE", "restaurant"),
 		},
 		WebSocket: WebSocketConfig{
 			AllowedOrigins: getEnvAsCSV("WS_ALLOWED_ORIGINS", []string{"*"}),

@@ -12,11 +12,38 @@ internal/repository     Database repositories
 internal/service        Business logic and interfaces
 internal/handler        HTTP/WebSocket handlers
 internal/router         Gin route registration and middleware
-internal/infrastructure MongoDB, Redis, realtime infrastructure
+infrastructure          MongoDB, Redis, realtime infrastructure
+integrations            Piso and MapVina API clients
+internal/strategy       Map provider selection strategy
 internal/cache          Cache/pub-sub abstraction
 ```
 
 Handlers depend on services. Services depend on repository/cache interfaces. Repositories own database access. Infrastructure clients are wired only in `cmd/server/main.go`.
+
+## Map provider
+
+Restaurant services use a provider-neutral map client. Select the implementation
+through `.env` without changing service code:
+
+```env
+MAP_PROVIDER=piso
+```
+
+Supported values are `piso` and `vinamap`. Configure the corresponding API key:
+
+```env
+PISO_API_KEY=your-piso-key
+
+# Or use MapVina
+MAP_PROVIDER=vinamap
+VINA_API_KEY=your-mapvina-key
+VINA_BASE_URL=https://maps.mapvina.com
+VINA_RADIUS=5000
+VINA_PLACE_TYPE=restaurant
+```
+
+The strategy selects one client at startup. The MapVina adapter normalizes its
+Google-compatible response to the restaurant schema consumed by the mobile app.
 
 ## Run locally
 

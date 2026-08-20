@@ -19,32 +19,23 @@ type ClientLocation struct {
 	Lng float64 `json:"lng"`
 }
 
-type PisoSearchParams struct {
+type MapSearchParams struct {
 	Query string
 	Lat   float64
 	Lng   float64
 	Limit int
 }
 
-type PisoPlaceParams struct {
+type MapPlaceParams struct {
 	DataID string
 	Lat    float64
 	Lng    float64
 }
 
-type VinamapSearchParams struct {
-	Query string
-	Lat   float64
-	Lng   float64
-	Limit int
-}
-
-type VinamapPlaceParams struct {
-	DataID string
-	Lat    float64
-	Lng    float64
-}
-
+type PisoSearchParams = MapSearchParams
+type PisoPlaceParams = MapPlaceParams
+type VinamapSearchParams = MapSearchParams
+type VinamapPlaceParams = MapPlaceParams
 
 type NearbyRestaurantsResponse struct {
 	Location ClientLocation  `json:"location"`
