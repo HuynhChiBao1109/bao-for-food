@@ -1,8 +1,8 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+
 import 'react-native-reanimated';
 
 import { AuthProvider } from '@/contexts/auth-context';
@@ -33,18 +33,28 @@ export default function RootLayout() {
   }
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <AuthProvider>
-        <LocationProvider>
-          <Stack>
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="profile" options={{ headerShown: false }} />
-            <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-          </Stack>
-          <StatusBar style="auto" />
-        </LocationProvider>
-      </AuthProvider>
-    </ThemeProvider>
+    <AuthProvider>
+      <LocationProvider>
+        <Stack
+          screenOptions={{
+            headerShown: false,
+          }}
+        >
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="profile" />
+          <Stack.Screen
+            name="modal"
+            options={{
+              presentation: 'modal',
+              title: 'Modal',
+              headerShown: true,
+            }}
+          />
+        </Stack>
+
+        <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
+      </LocationProvider>
+    </AuthProvider>
   );
 }
 
@@ -55,10 +65,12 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
   },
+
   bootIcon: {
     fontSize: 58,
     marginBottom: 12,
   },
+
   bootTitle: {
     color: '#fffdf5',
     fontSize: 24,
